@@ -40,6 +40,12 @@ func main() {
 
 	setupLogging(cfg.LogLevel)
 
+	// Run database migrations before anything else
+	if err := store.RunMigrations(cfg.DatabaseURL); err != nil {
+		slog.Error("failed to run migrations", "error", err)
+		os.Exit(1)
+	}
+
 	ctx := context.Background()
 
 	pgStore, err := store.NewPgStore(ctx, cfg.DatabaseURL, cfg.DBQueryTimeout, cfg.IDPrefix)
