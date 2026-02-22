@@ -1,0 +1,120 @@
+package store
+
+import (
+	"context"
+
+	"github.com/Actual-Outcomes/doit/internal/model"
+	"github.com/google/uuid"
+)
+
+// Store defines the persistence interface for doit.
+type Store interface {
+	// Issues
+	CreateIssue(ctx context.Context, input CreateIssueInput) (*model.Issue, error)
+	GetIssue(ctx context.Context, id string) (*model.Issue, error)
+	UpdateIssue(ctx context.Context, id string, input UpdateIssueInput) (*model.Issue, error)
+	ListIssues(ctx context.Context, filter model.IssueFilter) ([]model.Issue, error)
+	DeleteIssue(ctx context.Context, id string) error
+
+	// Ready detection
+	ListReady(ctx context.Context, filter model.IssueFilter) ([]model.Issue, error)
+
+	// Dependencies
+	AddDependency(ctx context.Context, input AddDependencyInput) (*model.Dependency, error)
+	RemoveDependency(ctx context.Context, issueID, dependsOnID string) error
+	ListDependencies(ctx context.Context, issueID string, direction string) ([]model.Dependency, error)
+	GetDependencyTree(ctx context.Context, rootID string, maxDepth int) ([]model.TreeNode, error)
+
+	// Hierarchical IDs
+	NextChildID(ctx context.Context, parentID string) (string, error)
+
+	// Labels
+	AddLabel(ctx context.Context, issueID, label string) error
+	RemoveLabel(ctx context.Context, issueID, label string) error
+	ListLabels(ctx context.Context, issueID string) ([]string, error)
+
+	// Comments
+	AddComment(ctx context.Context, issueID, author, text string) (*model.Comment, error)
+	ListComments(ctx context.Context, issueID string) ([]model.Comment, error)
+
+	// Events (audit trail)
+	AddEvent(ctx context.Context, input AddEventInput) (*model.Event, error)
+	ListEvents(ctx context.Context, issueID string, limit int) ([]model.Event, error)
+
+	// Compaction
+	SaveCompactionSnapshot(ctx context.Context, issueID string, level int, summary, original string) error
+	GetCompactionSnapshots(ctx context.Context, issueID string) ([]model.CompactionSnapshot, error)
+
+	// ID generation
+	GenerateID(ctx context.Context, prefix string) (string, error)
+
+	// Tenants
+	CreateTenant(ctx context.Context, name, slug string) (*model.Tenant, error)
+	ListTenants(ctx context.Context) ([]model.Tenant, error)
+	ResolveAPIKey(ctx context.Context, keyHash string) (uuid.UUID, error)
+	CreateAPIKey(ctx context.Context, tenantSlug, label, keyHash, prefix string) (*model.APIKeyInfo, error)
+	RevokeAPIKey(ctx context.Context, prefix string) error
+	ListAPIKeys(ctx context.Context, tenantSlug string) ([]model.APIKeyInfo, error)
+
+	Close()
+}
+
+// CreateIssueInput holds the fields for creating a new issue.
+type CreateIssueInput struct {
+	ID                 string              // pre-generated ID (hash-based or child)
+	Title              string
+	Description        string
+	Design             string
+	AcceptanceCriteria string
+	Notes              string
+	Status             model.Status
+	Priority           int
+	IssueType          model.IssueType
+	Assignee           string
+	Owner              string
+	CreatedBy          string
+	ParentID           string // if set, creates parent-child dependency
+	Labels             []string
+	Ephemeral          bool
+	MolType            model.MolType
+	WorkType           model.WorkType
+	WispType           model.WispType
+}
+
+// UpdateIssueInput holds optional fields for updating an issue.
+// Nil pointer = no change; non-nil = set to this value.
+type UpdateIssueInput struct {
+	Title              *string
+	Description        *string
+	Design             *string
+	AcceptanceCriteria *string
+	Notes              *string
+	Status             *model.Status
+	Priority           *int
+	Assignee           *string
+	Owner              *string
+	DueAt              *string // ISO 8601 or relative like "+6h"
+	DeferUntil         *string
+	CloseReason        *string
+	Pinned             *bool
+	ExternalRef        *string
+}
+
+// AddDependencyInput holds the fields for creating a dependency.
+type AddDependencyInput struct {
+	IssueID     string
+	DependsOnID string
+	Type        model.DependencyType
+	CreatedBy   string
+	ThreadID    string
+}
+
+// AddEventInput holds the fields for creating an audit event.
+type AddEventInput struct {
+	IssueID   string
+	EventType model.EventType
+	Actor     string
+	OldValue  string
+	NewValue  string
+	Comment   string
+}
