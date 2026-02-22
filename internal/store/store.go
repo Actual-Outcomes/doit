@@ -45,6 +45,9 @@ type Store interface {
 	SaveCompactionSnapshot(ctx context.Context, issueID string, level int, summary, original string) error
 	GetCompactionSnapshots(ctx context.Context, issueID string) ([]model.CompactionSnapshot, error)
 
+	// Aggregation
+	CountIssuesByStatus(ctx context.Context) (map[string]int, error)
+
 	// ID generation
 	GenerateID(ctx context.Context, prefix string) (string, error)
 

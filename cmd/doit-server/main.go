@@ -13,6 +13,7 @@ import (
 	"github.com/Actual-Outcomes/doit/internal/auth"
 	"github.com/Actual-Outcomes/doit/internal/config"
 	"github.com/Actual-Outcomes/doit/internal/store"
+	"github.com/Actual-Outcomes/doit/internal/ui"
 	"github.com/Actual-Outcomes/doit/internal/version"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -20,6 +21,17 @@ import (
 )
 
 func main() {
+	// Subcommand routing: default to "serve" if no args or first arg is a flag
+	cmd := "serve"
+	if len(os.Args) > 1 && os.Args[1] != "" && os.Args[1][0] != '-' {
+		cmd = os.Args[1]
+	}
+
+	if cmd != "serve" {
+		runAdmin(os.Args[1:])
+		return
+	}
+
 	cfg, err := config.Load()
 	if err != nil {
 		slog.Error("failed to load config", "error", err)
@@ -83,6 +95,10 @@ func main() {
 	})
 
 	r.Handle("/mcp", mcpHandler)
+
+	r.Get("/documentation", api.DocumentationHandler())
+
+	ui.RegisterUIRoutes(r, pgStore, cfg.AdminAPIKey, authCfg.AdminTenantID)
 
 	// Start server
 	srv := &http.Server{

@@ -731,6 +731,30 @@ func (s *PgStore) GetCompactionSnapshots(ctx context.Context, issueID string) ([
 	return snaps, rows.Err()
 }
 
+// --- Aggregation ---
+
+func (s *PgStore) CountIssuesByStatus(ctx context.Context) (map[string]int, error) {
+	ctx, cancel := s.withTimeout(ctx)
+	defer cancel()
+
+	rows, err := s.pool.Query(ctx, "SELECT status, COUNT(*) FROM issues GROUP BY status")
+	if err != nil {
+		return nil, fmt.Errorf("counting issues by status: %w", err)
+	}
+	defer rows.Close()
+
+	counts := make(map[string]int)
+	for rows.Next() {
+		var status string
+		var count int
+		if err := rows.Scan(&status, &count); err != nil {
+			return nil, fmt.Errorf("scanning count: %w", err)
+		}
+		counts[status] = count
+	}
+	return counts, rows.Err()
+}
+
 // --- Helpers ---
 
 const issueColumns = `id, content_hash, title, description, design, acceptance_criteria, notes,
