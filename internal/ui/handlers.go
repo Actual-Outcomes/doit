@@ -2,6 +2,7 @@ package ui
 
 import (
 	"crypto/subtle"
+	"fmt"
 	"html/template"
 	"log/slog"
 	"net/http"
@@ -329,4 +330,5 @@ var templateFuncs = template.FuncMap{
 	"truncate":      truncate,
 	"upper":         strings.ToUpper,
 	"replace":       strings.ReplaceAll,
+	"string":        func(v any) string { return fmt.Sprintf("%s", v) },
 }
