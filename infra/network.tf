@@ -68,8 +68,9 @@ resource "aws_apprunner_service" "doit" {
   }
 
   instance_configuration {
-    cpu    = "256"
-    memory = "512"
+    cpu               = "256"
+    memory            = "512"
+    instance_role_arn = aws_iam_role.apprunner_instance.arn
   }
 
   health_check_configuration {

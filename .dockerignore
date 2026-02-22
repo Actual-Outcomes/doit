@@ -1,0 +1,8 @@
+.git
+.beads
+.terraform
+infra/.terraform
+infra/.terraform.lock.hcl
+*.exe
+.mcp.json
+.claude
