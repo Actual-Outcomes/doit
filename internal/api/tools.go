@@ -10,6 +10,21 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
+// resolveProjectSlug takes a project identifier (slug or UUID) and returns
+// the project UUID string. If the input looks like a UUID (36 chars with dashes),
+// it is returned as-is; otherwise it is resolved as a slug via the store.
+func resolveProjectSlug(ctx context.Context, s store.Store, input string) (string, error) {
+	// UUID passthrough: 36 chars with dashes (e.g. "d0f96271-467b-41f0-9793-0f5150fc9a6d")
+	if len(input) == 36 && input[8] == '-' && input[13] == '-' && input[18] == '-' && input[23] == '-' {
+		return input, nil
+	}
+	p, err := s.GetProjectBySlug(ctx, input)
+	if err != nil {
+		return "", fmt.Errorf("resolving project %q: %w", input, err)
+	}
+	return p.ID.String(), nil
+}
+
 func jsonResult(v any) (*mcp.CallToolResult, any, error) {
 	data, _ := json.MarshalIndent(v, "", "  ")
 	return &mcp.CallToolResult{
@@ -35,7 +50,7 @@ type createIssueArgs struct {
 	Assignee           string   `json:"assignee"`
 	Owner              string   `json:"owner"`
 	ParentID           string   `json:"parent_id"`
-	ProjectID          string   `json:"project_id"`
+	Project            string   `json:"project"`
 	Labels             []string `json:"labels"`
 	Ephemeral          bool     `json:"ephemeral"`
 }
@@ -65,6 +80,14 @@ func (h *Handlers) CreateIssue(ctx context.Context, _ *mcp.CallToolRequest, args
 		createdBy = "system"
 	}
 
+	var projectID string
+	if args.Project != "" {
+		projectID, err = resolveProjectSlug(ctx, h.store, args.Project)
+		if err != nil {
+			return errResult(err)
+		}
+	}
+
 	issue, err := h.store.CreateIssue(ctx, store.CreateIssueInput{
 		ID:                 id,
 		Title:              args.Title,
@@ -78,7 +101,7 @@ func (h *Handlers) CreateIssue(ctx context.Context, _ *mcp.CallToolRequest, args
 		Assignee:           args.Assignee,
 		Owner:              args.Owner,
 		CreatedBy:          createdBy,
-		ProjectID:          args.ProjectID,
+		ProjectID:          projectID,
 		ParentID:           args.ParentID,
 		Labels:             args.Labels,
 		Ephemeral:          args.Ephemeral,
@@ -150,7 +173,7 @@ type listIssuesArgs struct {
 	IssueType string  `json:"issue_type"`
 	Priority  *int    `json:"priority"`
 	Assignee  string  `json:"assignee"`
-	ProjectID *string `json:"project_id"`
+	Project   *string `json:"project"`
 	Limit     int     `json:"limit"`
 	SortBy    string  `json:"sort_by"`
 }
@@ -174,8 +197,12 @@ func (h *Handlers) ListIssues(ctx context.Context, _ *mcp.CallToolRequest, args 
 	if args.Assignee != "" {
 		filter.Assignee = &args.Assignee
 	}
-	if args.ProjectID != nil && *args.ProjectID != "" {
-		filter.ProjectID = args.ProjectID
+	if args.Project != nil && *args.Project != "" {
+		resolved, err := resolveProjectSlug(ctx, h.store, *args.Project)
+		if err != nil {
+			return errResult(err)
+		}
+		filter.ProjectID = &resolved
 	}
 	if filter.Limit == 0 {
 		filter.Limit = 50
@@ -200,8 +227,8 @@ func (h *Handlers) DeleteIssue(ctx context.Context, _ *mcp.CallToolRequest, args
 }
 
 type readyArgs struct {
-	Limit     int     `json:"limit"`
-	ProjectID *string `json:"project_id"`
+	Limit   int     `json:"limit"`
+	Project *string `json:"project"`
 }
 
 func (h *Handlers) Ready(ctx context.Context, _ *mcp.CallToolRequest, args readyArgs) (*mcp.CallToolResult, any, error) {
@@ -210,8 +237,12 @@ func (h *Handlers) Ready(ctx context.Context, _ *mcp.CallToolRequest, args ready
 		limit = 20
 	}
 	filter := model.IssueFilter{Limit: limit}
-	if args.ProjectID != nil && *args.ProjectID != "" {
-		filter.ProjectID = args.ProjectID
+	if args.Project != nil && *args.Project != "" {
+		resolved, err := resolveProjectSlug(ctx, h.store, *args.Project)
+		if err != nil {
+			return errResult(err)
+		}
+		filter.ProjectID = &resolved
 	}
 	issues, err := h.store.ListReady(ctx, filter)
 	if err != nil {

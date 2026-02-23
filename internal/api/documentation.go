@@ -110,12 +110,12 @@ const documentationHTML = `<!DOCTYPE html>
 This project uses Doit for persistent work tracking via MCP.
 
 ### Workflow
-- Call doit_list_projects to find your project ID
-- Call doit_ready with project_id to find available work
+- Call doit_list_projects to find your project slug
+- Call doit_ready with project slug to find available work
 - Call doit_get_issue for full details before starting
 - Call doit_update_issue with claim=true to start work
 - Call doit_update_issue with status=closed when done
-- Call doit_create_issue with project_id for new work items
+- Call doit_create_issue with project slug for new work items
 - Call doit_add_dependency to track blockers</code></pre>
 
 <h2>Available Tools (25)</h2>
@@ -123,17 +123,17 @@ This project uses Doit for persistent work tracking via MCP.
 <h3>Issue CRUD</h3>
 <table>
   <tr><th>Tool</th><th>Description</th></tr>
-  <tr><td><code>doit_create_issue</code></td><td>Create a new work item (task, bug, feature, epic, etc). Returns the created issue with its hash-based ID. Use <code>parent_id</code> to create a hierarchical child (e.g. epic.1). Use <code>project_id</code> to assign to a project.</td></tr>
+  <tr><td><code>doit_create_issue</code></td><td>Create a new work item (task, bug, feature, epic, etc). Returns the created issue with its hash-based ID. Use <code>parent_id</code> to create a hierarchical child (e.g. epic.1). Use <code>project</code> (slug) to assign to a project.</td></tr>
   <tr><td><code>doit_get_issue</code></td><td>Get full details of an issue including labels, dependencies, and parent.</td></tr>
   <tr><td><code>doit_update_issue</code></td><td>Update fields on an existing issue. Only specified fields are changed. Use claim=true to atomically set assignee and status to in_progress.</td></tr>
-  <tr><td><code>doit_list_issues</code></td><td>List issues with filtering by status, type, priority, assignee, and labels. Supports sorting by priority, oldest, updated, or hybrid. Use <code>project_id</code> to scope results to a single project.</td></tr>
+  <tr><td><code>doit_list_issues</code></td><td>List issues with filtering by status, type, priority, assignee, and labels. Supports sorting by priority, oldest, updated, or hybrid. Use <code>project</code> (slug) to scope results to a single project.</td></tr>
   <tr><td><code>doit_delete_issue</code></td><td>Delete an issue. Cascades to dependencies, labels, comments, and events.</td></tr>
 </table>
 
 <h3>Ready Detection</h3>
 <table>
   <tr><th>Tool</th><th>Description</th></tr>
-  <tr><td><code>doit_ready</code></td><td>List issues ready for work — open, not blocked, not deferred. Call this to find the next task to work on. Use <code>project_id</code> to scope results to a single project.</td></tr>
+  <tr><td><code>doit_ready</code></td><td>List issues ready for work — open, not blocked, not deferred. Call this to find the next task to work on. Use <code>project</code> (slug) to scope results to a single project.</td></tr>
 </table>
 
 <h3>Dependencies</h3>
@@ -171,7 +171,7 @@ This project uses Doit for persistent work tracking via MCP.
 <table>
   <tr><th>Tool</th><th>Description</th></tr>
   <tr><td><code>doit_create_project</code></td><td>Create a project within your tenant for organizing issues.</td></tr>
-  <tr><td><code>doit_list_projects</code></td><td>List projects in your tenant. Returns project IDs for use with <code>project_id</code> filters.</td></tr>
+  <tr><td><code>doit_list_projects</code></td><td>List projects in your tenant. Returns project slugs for use with <code>project</code> filters.</td></tr>
 </table>
 
 <h3>Compaction</h3>

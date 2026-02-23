@@ -67,4 +67,4 @@ This project uses its own doit MCP server at `din.aoendpoint.com` for tracking d
 - `doit_ready` — see what's unblocked and ready for work
 - `doit_get_issue` — view issue details
 - `doit_update_issue` with claim=true — claim and start work
-- `doit_create_issue` — create new work items (set project_id)
+- `doit_create_issue` — create new work items (set `project` slug)

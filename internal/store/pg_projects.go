@@ -59,6 +59,27 @@ func (s *PgStore) ListProjects(ctx context.Context) ([]model.Project, error) {
 	return projects, rows.Err()
 }
 
+// GetProjectBySlug returns a single project by its slug within the tenant.
+func (s *PgStore) GetProjectBySlug(ctx context.Context, slug string) (*model.Project, error) {
+	ctx, cancel := s.withTimeout(ctx)
+	defer cancel()
+
+	tenantID, ok := auth.TenantFromContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("no tenant in context")
+	}
+
+	p := &model.Project{}
+	err := s.pool.QueryRow(ctx,
+		"SELECT id, tenant_id, name, slug, created_at FROM project WHERE tenant_id = $1 AND slug = $2",
+		tenantID, slug).
+		Scan(&p.ID, &p.TenantID, &p.Name, &p.Slug, &p.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("project not found for slug %q: %w", slug, err)
+	}
+	return p, nil
+}
+
 // addProjectFilter appends a project_id filter to a query when allowed projects are set in context.
 // Returns the modified query, args, and argN.
 func addProjectFilter(ctx context.Context, query string, args []any, argN int, column string) (string, []any, int) {

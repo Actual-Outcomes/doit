@@ -53,6 +53,7 @@ type Store interface {
 
 	// Projects
 	CreateProject(ctx context.Context, name, slug string) (*model.Project, error)
+	GetProjectBySlug(ctx context.Context, slug string) (*model.Project, error)
 	ListProjects(ctx context.Context) ([]model.Project, error)
 
 	// Tenants
