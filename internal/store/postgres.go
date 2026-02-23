@@ -572,18 +572,18 @@ func (s *PgStore) GetDependencyTree(ctx context.Context, rootID string, maxDepth
 	// Recursive CTE to walk parent-child tree
 	rows, err := s.pool.Query(ctx, `
 		WITH RECURSIVE tree AS (
-			SELECT id, 0 as depth
+			SELECT id AS issue_id, 0 as depth
 			FROM issues WHERE id = $1
 			UNION ALL
 			SELECT i.id, t.depth + 1
 			FROM issues i
 			JOIN dependencies d ON d.issue_id = i.id AND d.type = 'parent-child'
-			JOIN tree t ON d.depends_on_id = t.id
+			JOIN tree t ON d.depends_on_id = t.issue_id
 			WHERE t.depth < $2
 		)
 		SELECT t.depth, `+issueColumns+`
 		FROM tree t
-		JOIN issues i ON i.id = t.id
+		JOIN issues i ON i.id = t.issue_id
 		ORDER BY t.depth, i.priority, i.created_at`, rootID, maxDepth)
 	if err != nil {
 		return nil, fmt.Errorf("walking dependency tree: %w", err)
@@ -860,7 +860,7 @@ func (s *PgStore) scanIssues(ctx context.Context, q querier, query string, args 
 	}
 	defer rows.Close()
 
-	var issues []model.Issue
+	issues := []model.Issue{}
 	for rows.Next() {
 		issue, err := scanIssueFromRow(rows)
 		if err != nil {

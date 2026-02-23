@@ -139,17 +139,28 @@ type updateIssueArgs struct {
 }
 
 func (h *Handlers) UpdateIssue(ctx context.Context, _ *mcp.CallToolRequest, args updateIssueArgs) (*mcp.CallToolResult, any, error) {
-	input := store.UpdateIssueInput{
-		Title:       args.Title,
-		Description: args.Description,
-		Priority:    args.Priority,
-		Assignee:    args.Assignee,
-		Owner:       args.Owner,
-		Pinned:      args.Pinned,
-		Notes:       args.Notes,
+	// Filter out literal "null" strings that arrive from MCP client serialization.
+	// go-sdk/mcp marks all struct fields as required, so clients send null for
+	// fields they don't want to change. The JSON round-trip can turn *string null
+	// into the literal string "null".
+	filterNull := func(s *string) *string {
+		if s != nil && *s == "null" {
+			return nil
+		}
+		return s
 	}
 
-	if args.Status != nil {
+	input := store.UpdateIssueInput{
+		Title:       filterNull(args.Title),
+		Description: filterNull(args.Description),
+		Priority:    args.Priority,
+		Assignee:    filterNull(args.Assignee),
+		Owner:       filterNull(args.Owner),
+		Pinned:      args.Pinned,
+		Notes:       filterNull(args.Notes),
+	}
+
+	if args.Status != nil && *args.Status != "null" {
 		s := model.Status(*args.Status)
 		input.Status = &s
 	}

@@ -133,6 +133,25 @@ func RegisterTools(server *mcp.Server, h *Handlers) {
 		Description: "List projects in your tenant.",
 	}, h.ListProjects)
 
+	// --- Lessons ---
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "doit_record_lesson",
+		Description: "Record a lesson learned — a mistake and its correction. " +
+			"Used for continuous improvement. Tag with components and expert role.",
+	}, h.RecordLesson)
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "doit_list_lessons",
+		Description: "List lessons learned, filtered by project, status, expert, component, or severity. " +
+			"Review before starting work to avoid repeating mistakes.",
+	}, h.ListLessons)
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "doit_resolve_lesson",
+		Description: "Mark a lesson as resolved after the correction has been applied.",
+	}, h.ResolveLesson)
+
 	// --- Tenant Management (admin only) ---
 
 	mcp.AddTool(server, &mcp.Tool{

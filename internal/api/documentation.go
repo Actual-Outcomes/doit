@@ -118,7 +118,7 @@ This project uses Doit for persistent work tracking via MCP.
 - Call doit_create_issue with project slug for new work items
 - Call doit_add_dependency to track blockers</code></pre>
 
-<h2>Available Tools (25)</h2>
+<h2>Available Tools (28)</h2>
 
 <h3>Issue CRUD</h3>
 <table>
@@ -180,6 +180,14 @@ This project uses Doit for persistent work tracking via MCP.
   <tr><td><code>doit_compact</code></td><td>Run semantic compaction on old closed issues. Summarizes issues to save context window tokens. Default threshold: 7 days.</td></tr>
 </table>
 
+<h3>Lessons Learned</h3>
+<table>
+  <tr><th>Tool</th><th>Description</th></tr>
+  <tr><td><code>doit_record_lesson</code></td><td>Record a lesson learned — a mistake and its correction. Tag with components and expert role for filtering. Use <code>project</code> (slug) to scope.</td></tr>
+  <tr><td><code>doit_list_lessons</code></td><td>List lessons learned, filtered by project, status, expert, component, or severity. Review before starting work to avoid repeating mistakes.</td></tr>
+  <tr><td><code>doit_resolve_lesson</code></td><td>Mark a lesson as resolved after the correction has been applied.</td></tr>
+</table>
+
 <h3>Tenant Management (Admin Only)</h3>
 <table>
   <tr><th>Tool</th><th>Description</th></tr>
@@ -214,6 +222,12 @@ This project uses Doit for persistent work tracking via MCP.
   <span class="badge" style="background:#e2e8f0;color:#475569;">message</span>
   <span class="badge" style="background:#e2e8f0;color:#475569;">molecule</span>
   <span class="badge" style="background:#e2e8f0;color:#475569;">event</span>
+</p>
+
+<h3>Lesson Statuses</h3>
+<p>
+  <span class="badge badge-open">open</span>
+  <span class="badge badge-closed">resolved</span>
 </p>
 
 <h3>Dependency Types (19)</h3>

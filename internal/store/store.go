@@ -51,6 +51,12 @@ type Store interface {
 	// ID generation
 	GenerateID(ctx context.Context, prefix string) (string, error)
 
+	// Lessons
+	RecordLesson(ctx context.Context, input RecordLessonInput) (*model.Lesson, error)
+	ListLessons(ctx context.Context, filter model.LessonFilter) ([]model.Lesson, error)
+	ResolveLesson(ctx context.Context, id string, resolvedBy string) (*model.Lesson, error)
+	GenerateLessonID(ctx context.Context) (string, error)
+
 	// Projects
 	CreateProject(ctx context.Context, name, slug string) (*model.Project, error)
 	GetProjectBySlug(ctx context.Context, slug string) (*model.Project, error)
@@ -116,6 +122,19 @@ type AddDependencyInput struct {
 	Type        model.DependencyType
 	CreatedBy   string
 	ThreadID    string
+}
+
+// RecordLessonInput holds the fields for recording a lesson learned.
+type RecordLessonInput struct {
+	Title      string
+	Mistake    string
+	Correction string
+	ProjectID  string
+	IssueID    string
+	Expert     string
+	Components []string
+	Severity   int
+	CreatedBy  string
 }
 
 // AddEventInput holds the fields for creating an audit event.
