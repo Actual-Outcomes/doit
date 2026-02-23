@@ -43,7 +43,7 @@ go test ./...                # Run all tests
 - Hierarchical tasks (epic.task.subtask)
 - Dependency tracking and "ready" detection
 - Semantic compaction (memory decay)
-- Agent-to-agent messaging with threading
+- Agent-to-agent messaging via [TheHerald](https://herald.aoendpoint.com/documentation)
 - Multi-tenant with API keys
 - JSON output for agent consumption
 

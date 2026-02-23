@@ -84,7 +84,7 @@ const documentationHTML = `<!DOCTYPE html>
 <p class="subtitle">Plan, track, and coordinate work across AI agent sessions &middot; v{{VERSION}}</p>
 
 <h2>What is Doit?</h2>
-<p>Doit is an <strong>MCP server</strong> that gives AI coding assistants persistent work tracking. It manages <strong>issues</strong> (tasks, bugs, features, epics), <strong>dependencies</strong>, <strong>comments</strong>, and <strong>messages</strong> between agents.</p>
+<p>Doit is an <strong>MCP server</strong> that gives AI coding assistants persistent work tracking. It manages <strong>issues</strong> (tasks, bugs, features, epics), <strong>dependencies</strong>, and <strong>comments</strong>. For agent-to-agent messaging, use <a href="https://herald.aoendpoint.com/documentation">TheHerald</a>.</p>
 <p>Think of it as a lightweight issue tracker purpose-built for AI agents — with hash-based IDs, hierarchical tasks, dependency-aware "ready" detection, and semantic compaction for memory decay.</p>
 
 <h2>Quick Start</h2>
@@ -125,7 +125,7 @@ This project uses Doit for persistent work tracking via MCP.
 - Call doit_create_issue with project slug for new work items
 - Call doit_add_dependency to track blockers</code></pre>
 
-<h2>Agent Tools (23)</h2>
+<h2>Agent Tools (20)</h2>
 <p>Available on <code>POST /mcp</code> — authenticated with any API key (tenant or admin).</p>
 
 <h3>Issue CRUD</h3>
@@ -165,14 +165,6 @@ This project uses Doit for persistent work tracking via MCP.
   <tr><th>Tool</th><th>Description</th></tr>
   <tr><td><code>doit_add_label</code></td><td>Add a label to an issue.</td></tr>
   <tr><td><code>doit_remove_label</code></td><td>Remove a label from an issue.</td></tr>
-</table>
-
-<h3>Messaging</h3>
-<table>
-  <tr><th>Tool</th><th>Description</th></tr>
-  <tr><td><code>doit_send_message</code></td><td>Send a message to another agent. Uses issue-type 'message' with sender/assignee. Use thread_id to reply.</td></tr>
-  <tr><td><code>doit_list_messages</code></td><td>List messages, optionally filtered by recipient or unread status.</td></tr>
-  <tr><td><code>doit_mark_message_read</code></td><td>Mark a message as read (sets status to closed).</td></tr>
 </table>
 
 <h3>Projects</h3>
@@ -230,7 +222,6 @@ This project uses Doit for persistent work tracking via MCP.
   <span class="badge badge-epic">epic</span>
   <span class="badge" style="background:#e2e8f0;color:#475569;">chore</span>
   <span class="badge" style="background:#e2e8f0;color:#475569;">decision</span>
-  <span class="badge" style="background:#e2e8f0;color:#475569;">message</span>
   <span class="badge" style="background:#e2e8f0;color:#475569;">molecule</span>
   <span class="badge" style="background:#e2e8f0;color:#475569;">event</span>
 </p>
@@ -262,8 +253,8 @@ This project uses Doit for persistent work tracking via MCP.
 <h3>Semantic Compaction</h3>
 <p>Old closed issues can be compacted to save context window tokens. The original content is preserved in a snapshot. Use <code>doit_compact</code> to trigger.</p>
 
-<h3>Agent Messaging</h3>
-<p>Agents can send messages to each other using <code>doit_send_message</code>. Messages are issues of type <code>message</code> with a sender and recipient (assignee). Threading is supported via <code>thread_id</code>.</p>
+<h3>Agent Messaging &rarr; TheHerald</h3>
+<p>Agent-to-agent messaging is handled by <a href="https://herald.aoendpoint.com/documentation"><strong>TheHerald</strong></a>, a dedicated messaging MCP server. Herald provides typed messages (DO, ASK, TELL, HAND), conversation threading, signals (ACK, CLAIM, BLOCK, REJECT), and agent identity. Add Herald to your <code>.mcp.json</code> alongside Doit.</p>
 
 <hr>
 
@@ -271,7 +262,7 @@ This project uses Doit for persistent work tracking via MCP.
 <table>
   <tr><th>Endpoint</th><th>Auth</th><th>Description</th></tr>
   <tr><td><code>GET /health</code></td><td>None</td><td>Health check</td></tr>
-  <tr><td><code>POST /mcp</code></td><td>Bearer token</td><td>Agent MCP server (23 tools)</td></tr>
+  <tr><td><code>POST /mcp</code></td><td>Bearer token</td><td>Agent MCP server (20 tools)</td></tr>
   <tr><td><code>POST /admin/mcp</code></td><td>Admin key</td><td>Admin MCP server (5 tools)</td></tr>
   <tr><td><code>GET /documentation</code></td><td>None</td><td>This page</td></tr>
   <tr><td><code>GET /ui/</code></td><td>Session cookie</td><td>Web UI (login with API key)</td></tr>

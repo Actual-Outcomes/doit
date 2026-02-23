@@ -2,7 +2,7 @@ package api
 
 import "github.com/modelcontextprotocol/go-sdk/mcp"
 
-// RegisterAgentTools registers agent-facing MCP tools (23 tools).
+// RegisterAgentTools registers agent-facing MCP tools (20 tools).
 func RegisterAgentTools(server *mcp.Server, h *Handlers) {
 	// --- Issue CRUD ---
 
@@ -94,24 +94,6 @@ func RegisterAgentTools(server *mcp.Server, h *Handlers) {
 		Name: "doit_remove_label",
 		Description: "Remove a label from an issue.",
 	}, h.RemoveLabel)
-
-	// --- Messaging ---
-
-	mcp.AddTool(server, &mcp.Tool{
-		Name: "doit_send_message",
-		Description: "Send a message to another agent. Messages are issue-type 'message' " +
-			"with sender/assignee. Use thread_id to reply to an existing message.",
-	}, h.SendMessage)
-
-	mcp.AddTool(server, &mcp.Tool{
-		Name: "doit_list_messages",
-		Description: "List messages, optionally filtered by recipient or unread status.",
-	}, h.ListMessages)
-
-	mcp.AddTool(server, &mcp.Tool{
-		Name: "doit_mark_message_read",
-		Description: "Mark a message as read (sets status to closed).",
-	}, h.MarkMessageRead)
 
 	// --- Compaction ---
 
