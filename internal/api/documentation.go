@@ -90,14 +90,21 @@ const documentationHTML = `<!DOCTYPE html>
 <h2>Quick Start</h2>
 
 <h3>1. Configure MCP Connection</h3>
-<p>Add to your project's <code>.mcp.json</code>:</p>
+<p>Add to your project's <code>.mcp.json</code>. Agents use <code>/mcp</code>; admins use <code>/admin/mcp</code>:</p>
 <pre><code>{
   "mcpServers": {
     "doit": {
       "type": "http",
       "url": "https://din.aoendpoint.com/mcp",
       "headers": {
-        "Authorization": "Bearer YOUR_API_KEY"
+        "Authorization": "Bearer YOUR_TENANT_API_KEY"
+      }
+    },
+    "doit-admin": {
+      "type": "http",
+      "url": "https://din.aoendpoint.com/admin/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_ADMIN_API_KEY"
       }
     }
   }
@@ -118,7 +125,8 @@ This project uses Doit for persistent work tracking via MCP.
 - Call doit_create_issue with project slug for new work items
 - Call doit_add_dependency to track blockers</code></pre>
 
-<h2>Available Tools (28)</h2>
+<h2>Agent Tools (23)</h2>
+<p>Available on <code>POST /mcp</code> — authenticated with any API key (tenant or admin).</p>
 
 <h3>Issue CRUD</h3>
 <table>
@@ -188,7 +196,10 @@ This project uses Doit for persistent work tracking via MCP.
   <tr><td><code>doit_resolve_lesson</code></td><td>Mark a lesson as resolved after the correction has been applied.</td></tr>
 </table>
 
-<h3>Tenant Management (Admin Only)</h3>
+<h2>Admin Tools (5)</h2>
+<p>Available on <code>POST /admin/mcp</code> — requires admin API key. Tenant keys receive 403.</p>
+
+<h3>Tenant Management</h3>
 <table>
   <tr><th>Tool</th><th>Description</th></tr>
   <tr><td><code>doit_create_tenant</code></td><td>Create a new tenant. Each tenant gets isolated data.</td></tr>
@@ -260,7 +271,8 @@ This project uses Doit for persistent work tracking via MCP.
 <table>
   <tr><th>Endpoint</th><th>Auth</th><th>Description</th></tr>
   <tr><td><code>GET /health</code></td><td>None</td><td>Health check</td></tr>
-  <tr><td><code>POST /mcp</code></td><td>Bearer token</td><td>MCP protocol (Streamable HTTP)</td></tr>
+  <tr><td><code>POST /mcp</code></td><td>Bearer token</td><td>Agent MCP server (23 tools)</td></tr>
+  <tr><td><code>POST /admin/mcp</code></td><td>Admin key</td><td>Admin MCP server (5 tools)</td></tr>
   <tr><td><code>GET /documentation</code></td><td>None</td><td>This page</td></tr>
   <tr><td><code>GET /ui/</code></td><td>Session cookie</td><td>Web UI (login with API key)</td></tr>
 </table>

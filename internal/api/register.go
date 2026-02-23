@@ -2,8 +2,8 @@ package api
 
 import "github.com/modelcontextprotocol/go-sdk/mcp"
 
-// RegisterTools registers all doit MCP tools on the server.
-func RegisterTools(server *mcp.Server, h *Handlers) {
+// RegisterAgentTools registers agent-facing MCP tools (23 tools).
+func RegisterAgentTools(server *mcp.Server, h *Handlers) {
 	// --- Issue CRUD ---
 
 	mcp.AddTool(server, &mcp.Tool{
@@ -152,8 +152,10 @@ func RegisterTools(server *mcp.Server, h *Handlers) {
 		Description: "Mark a lesson as resolved after the correction has been applied.",
 	}, h.ResolveLesson)
 
-	// --- Tenant Management (admin only) ---
+}
 
+// RegisterAdminTools registers admin-only MCP tools (5 tools).
+func RegisterAdminTools(server *mcp.Server, h *Handlers) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "doit_create_tenant",
 		Description: "Create a new tenant. Requires admin API key. " +

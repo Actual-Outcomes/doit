@@ -10,15 +10,15 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
+// NOTE: Admin authorization is enforced by auth.AdminOnlyMiddleware on the
+// /admin/mcp route. These handlers no longer check IsAdmin themselves.
+
 type createTenantArgs struct {
 	Name string `json:"name"`
 	Slug string `json:"slug"`
 }
 
 func (h *Handlers) CreateTenant(ctx context.Context, _ *mcp.CallToolRequest, args createTenantArgs) (*mcp.CallToolResult, any, error) {
-	if !auth.IsAdmin(ctx) {
-		return errResult(fmt.Errorf("admin access required"))
-	}
 	tenant, err := h.store.CreateTenant(ctx, args.Name, args.Slug)
 	if err != nil {
 		return errResult(err)
@@ -29,9 +29,6 @@ func (h *Handlers) CreateTenant(ctx context.Context, _ *mcp.CallToolRequest, arg
 type listTenantsArgs struct{}
 
 func (h *Handlers) ListTenants(ctx context.Context, _ *mcp.CallToolRequest, _ listTenantsArgs) (*mcp.CallToolResult, any, error) {
-	if !auth.IsAdmin(ctx) {
-		return errResult(fmt.Errorf("admin access required"))
-	}
 	tenants, err := h.store.ListTenants(ctx)
 	if err != nil {
 		return errResult(err)
@@ -45,10 +42,6 @@ type createAPIKeyArgs struct {
 }
 
 func (h *Handlers) CreateAPIKey(ctx context.Context, _ *mcp.CallToolRequest, args createAPIKeyArgs) (*mcp.CallToolResult, any, error) {
-	if !auth.IsAdmin(ctx) {
-		return errResult(fmt.Errorf("admin access required"))
-	}
-
 	// Generate raw key
 	raw := make([]byte, 32)
 	if _, err := rand.Read(raw); err != nil {
@@ -76,9 +69,6 @@ type revokeAPIKeyArgs struct {
 }
 
 func (h *Handlers) RevokeAPIKey(ctx context.Context, _ *mcp.CallToolRequest, args revokeAPIKeyArgs) (*mcp.CallToolResult, any, error) {
-	if !auth.IsAdmin(ctx) {
-		return errResult(fmt.Errorf("admin access required"))
-	}
 	if err := h.store.RevokeAPIKey(ctx, args.Prefix); err != nil {
 		return errResult(err)
 	}
@@ -90,9 +80,6 @@ type listAPIKeysArgs struct {
 }
 
 func (h *Handlers) ListAPIKeys(ctx context.Context, _ *mcp.CallToolRequest, args listAPIKeysArgs) (*mcp.CallToolResult, any, error) {
-	if !auth.IsAdmin(ctx) {
-		return errResult(fmt.Errorf("admin access required"))
-	}
 	keys, err := h.store.ListAPIKeys(ctx, args.Tenant)
 	if err != nil {
 		return errResult(err)

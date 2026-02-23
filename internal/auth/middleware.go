@@ -68,6 +68,20 @@ func APIKeyMiddleware(cfg MiddlewareConfig) func(http.Handler) http.Handler {
 	}
 }
 
+// AdminOnlyMiddleware rejects requests that are not authenticated as admin.
+// Must be placed after APIKeyMiddleware in the middleware chain.
+func AdminOnlyMiddleware() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if !IsAdmin(r.Context()) {
+				http.Error(w, "admin access required", http.StatusForbidden)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 // HashKey returns the SHA-256 hex digest of a raw API key.
 func HashKey(raw string) string {
 	h := sha256.Sum256([]byte(raw))

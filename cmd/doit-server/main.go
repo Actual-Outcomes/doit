@@ -55,17 +55,25 @@ func main() {
 	}
 	defer pgStore.Close()
 
-	// MCP server
-	mcpServer := mcp.NewServer(&mcp.Implementation{
+	// MCP servers: agent (23 tools) + admin (5 tools)
+	agentMCP := mcp.NewServer(&mcp.Implementation{
 		Name:    "doit-mcp",
+		Version: version.Number,
+	}, nil)
+	adminMCP := mcp.NewServer(&mcp.Implementation{
+		Name:    "doit-admin-mcp",
 		Version: version.Number,
 	}, nil)
 
 	handlers := api.NewHandlers(pgStore)
-	api.RegisterTools(mcpServer, handlers)
+	api.RegisterAgentTools(agentMCP, handlers)
+	api.RegisterAdminTools(adminMCP, handlers)
 
-	mcpHandler := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
-		return mcpServer
+	agentMCPHandler := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
+		return agentMCP
+	}, &mcp.StreamableHTTPOptions{Stateless: true})
+	adminMCPHandler := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
+		return adminMCP
 	}, &mcp.StreamableHTTPOptions{Stateless: true})
 
 	// Auth config
@@ -100,7 +108,11 @@ func main() {
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	r.Handle("/mcp", mcpHandler)
+	r.Handle("/mcp", agentMCPHandler)
+	r.Route("/admin", func(r chi.Router) {
+		r.Use(auth.AdminOnlyMiddleware())
+		r.Handle("/mcp", adminMCPHandler)
+	})
 
 	r.Get("/documentation", api.DocumentationHandler())
 
