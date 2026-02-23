@@ -50,9 +50,10 @@ resource "aws_apprunner_service" "doit" {
           API_KEY      = "${aws_secretsmanager_secret.doit_config.arn}:API_KEY::"
         }
         runtime_environment_variables = {
-          LOG_LEVEL = "info"
-          ID_PREFIX = "doit"
-          PORT      = "8080"
+          LOG_LEVEL         = "info"
+          ID_PREFIX         = "doit"
+          PORT              = "8080"
+          ADMIN_TENANT_SLUG = "default"
         }
       }
     }
