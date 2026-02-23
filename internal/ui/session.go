@@ -10,12 +10,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Actual-Outcomes/doit/internal/auth"
 	"github.com/google/uuid"
 )
 
 const (
 	sessionCookieName = "doit_session"
 	sessionDuration   = 24 * time.Hour
+
+	projectCookieName = "doit_project"
+	projectCookieAge  = 30 * 24 * time.Hour
 )
 
 // Session holds the decoded session data from a verified cookie.
@@ -113,7 +117,43 @@ func clearSessionCookie(w http.ResponseWriter) {
 	})
 }
 
+// setProjectCookie writes the selected project ID cookie.
+func setProjectCookie(w http.ResponseWriter, projectID string) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     projectCookieName,
+		Value:    projectID,
+		Path:     "/ui/",
+		MaxAge:   int(projectCookieAge.Seconds()),
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+// clearProjectCookie expires the project cookie.
+func clearProjectCookie(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     projectCookieName,
+		Value:    "",
+		Path:     "/ui/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+// getProjectCookie returns the project ID from the cookie, if set.
+func getProjectCookie(r *http.Request) string {
+	cookie, err := r.Cookie(projectCookieName)
+	if err != nil || cookie.Value == "" {
+		return ""
+	}
+	return cookie.Value
+}
+
 // SessionMiddleware validates session cookies and redirects to login if invalid.
+// It also injects project filtering into the context if a project cookie is set.
 func SessionMiddleware(signingKey string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -128,6 +168,12 @@ func SessionMiddleware(signingKey string) func(http.Handler) http.Handler {
 				clearSessionCookie(w)
 				http.Redirect(w, r, "/ui/login", http.StatusFound)
 				return
+			}
+
+			// Inject project filter if project cookie is set
+			if projectID := getProjectCookie(r); projectID != "" {
+				ctx := auth.WithAllowedProjects(r.Context(), []string{projectID})
+				r = r.WithContext(ctx)
 			}
 
 			next.ServeHTTP(w, r)

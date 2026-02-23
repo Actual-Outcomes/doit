@@ -119,6 +119,18 @@ func RegisterTools(server *mcp.Server, h *Handlers) {
 			"Summarizes issues to save context window tokens. Default threshold: 7 days.",
 	}, h.Compact)
 
+	// --- Projects ---
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "doit_create_project",
+		Description: "Create a project within your tenant for organizing issues.",
+	}, h.CreateProject)
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "doit_list_projects",
+		Description: "List projects in your tenant.",
+	}, h.ListProjects)
+
 	// --- Tenant Management (admin only) ---
 
 	mcp.AddTool(server, &mcp.Tool{

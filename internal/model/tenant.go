@@ -14,6 +14,15 @@ type Tenant struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// Project represents a project within a tenant for organizing issues.
+type Project struct {
+	ID        uuid.UUID `json:"id"`
+	TenantID  uuid.UUID `json:"tenant_id"`
+	Name      string    `json:"name"`
+	Slug      string    `json:"slug"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 // APIKeyInfo is a non-secret view of an API key.
 type APIKeyInfo struct {
 	ID        uuid.UUID  `json:"id"`

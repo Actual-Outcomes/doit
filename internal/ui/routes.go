@@ -20,6 +20,7 @@ func RegisterUIRoutes(r chi.Router, s store.Store, adminKey string, adminTenantI
 			protected.Use(SessionMiddleware(adminKey))
 
 			protected.Post("/logout", h.Logout)
+			protected.Post("/project", h.ProjectSwitch)
 			protected.Get("/", h.Dashboard)
 			protected.Get("/issues", h.IssueList)
 			protected.Get("/issues/{id}", h.IssueDetail)

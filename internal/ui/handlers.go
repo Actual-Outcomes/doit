@@ -137,6 +137,50 @@ func (h *UIHandlers) Logout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/ui/login", http.StatusFound)
 }
 
+// addProjectData loads projects and current selection into template data.
+// It uses a clean context (without project filter) to list all projects.
+func (h *UIHandlers) addProjectData(r *http.Request, data map[string]any) {
+	// Build a context without the project filter so we list all projects
+	ctx := auth.WithTenant(r.Context(), h.tenantIDFromRequest(r))
+	projects, err := h.store.ListProjects(ctx)
+	if err != nil {
+		slog.Error("addProjectData: list projects failed", "error", err)
+		projects = nil
+	}
+	data["Projects"] = projects
+	data["CurrentProject"] = getProjectCookie(r)
+}
+
+// tenantIDFromRequest extracts the tenant ID from the session cookie.
+func (h *UIHandlers) tenantIDFromRequest(r *http.Request) uuid.UUID {
+	cookie, err := r.Cookie(sessionCookieName)
+	if err != nil {
+		return uuid.Nil
+	}
+	sess, err := verifyCookie(cookie.Value, h.signingKey)
+	if err != nil {
+		return uuid.Nil
+	}
+	return sess.TenantID
+}
+
+// ProjectSwitch handles POST /ui/project to switch the active project.
+func (h *UIHandlers) ProjectSwitch(w http.ResponseWriter, r *http.Request) {
+	projectID := r.FormValue("project_id")
+	if projectID == "" {
+		clearProjectCookie(w)
+	} else {
+		setProjectCookie(w, projectID)
+	}
+
+	// Redirect back to referrer or dashboard
+	ref := r.Header.Get("Referer")
+	if ref == "" {
+		ref = "/ui/"
+	}
+	http.Redirect(w, r, ref, http.StatusFound)
+}
+
 // Dashboard shows the overview page with stat cards.
 func (h *UIHandlers) Dashboard(w http.ResponseWriter, r *http.Request) {
 	counts, err := h.store.CountIssuesByStatus(r.Context())
@@ -163,14 +207,16 @@ func (h *UIHandlers) Dashboard(w http.ResponseWriter, r *http.Request) {
 		ready = nil
 	}
 
-	h.render(w, "dashboard", map[string]any{
+	data := map[string]any{
 		"Title":     "Dashboard",
 		"ShowNav":   true,
 		"NavActive": "dashboard",
 		"Counts":    counts,
 		"Recent":    recent,
 		"Ready":     ready,
-	})
+	}
+	h.addProjectData(r, data)
+	h.render(w, "dashboard", data)
 }
 
 // IssueList lists issues with filtering.
@@ -205,7 +251,7 @@ func (h *UIHandlers) IssueList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.render(w, "issues", map[string]any{
+	data := map[string]any{
 		"Title":          "Issues",
 		"ShowNav":        true,
 		"NavActive":      "issues",
@@ -214,7 +260,9 @@ func (h *UIHandlers) IssueList(w http.ResponseWriter, r *http.Request) {
 		"FilterType":     q.Get("type"),
 		"FilterPriority": q.Get("priority"),
 		"FilterAssignee": q.Get("assignee"),
-	})
+	}
+	h.addProjectData(r, data)
+	h.render(w, "issues", data)
 }
 
 // IssueDetail shows a single issue with labels, deps, and comments.
@@ -238,14 +286,16 @@ func (h *UIHandlers) IssueDetail(w http.ResponseWriter, r *http.Request) {
 		deps = nil
 	}
 
-	h.render(w, "issueDetail", map[string]any{
+	data := map[string]any{
 		"Title":        issue.Title,
 		"ShowNav":      true,
 		"NavActive":    "issues",
 		"Issue":        issue,
 		"Comments":     comments,
 		"Dependencies": deps,
-	})
+	}
+	h.addProjectData(r, data)
+	h.render(w, "issueDetail", data)
 }
 
 // ReadyWork shows issues ready for work.
@@ -257,12 +307,14 @@ func (h *UIHandlers) ReadyWork(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.render(w, "ready", map[string]any{
+	data := map[string]any{
 		"Title":     "Ready Work",
 		"ShowNav":   true,
 		"NavActive": "ready",
 		"Issues":    ready,
-	})
+	}
+	h.addProjectData(r, data)
+	h.render(w, "ready", data)
 }
 
 // priorityLabel returns a human-readable priority label.

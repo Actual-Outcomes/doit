@@ -51,6 +51,10 @@ type Store interface {
 	// ID generation
 	GenerateID(ctx context.Context, prefix string) (string, error)
 
+	// Projects
+	CreateProject(ctx context.Context, name, slug string) (*model.Project, error)
+	ListProjects(ctx context.Context) ([]model.Project, error)
+
 	// Tenants
 	CreateTenant(ctx context.Context, name, slug string) (*model.Tenant, error)
 	ListTenants(ctx context.Context) ([]model.Tenant, error)
@@ -76,6 +80,7 @@ type CreateIssueInput struct {
 	Assignee           string
 	Owner              string
 	CreatedBy          string
+	ProjectID          string // project to assign the issue to
 	ParentID           string // if set, creates parent-child dependency
 	Labels             []string
 	Ephemeral          bool

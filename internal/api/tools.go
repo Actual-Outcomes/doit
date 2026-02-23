@@ -35,6 +35,7 @@ type createIssueArgs struct {
 	Assignee           string   `json:"assignee"`
 	Owner              string   `json:"owner"`
 	ParentID           string   `json:"parent_id"`
+	ProjectID          string   `json:"project_id"`
 	Labels             []string `json:"labels"`
 	Ephemeral          bool     `json:"ephemeral"`
 }
@@ -68,6 +69,7 @@ func (h *Handlers) CreateIssue(ctx context.Context, _ *mcp.CallToolRequest, args
 		IssueType:          issueType,
 		Assignee:           args.Assignee,
 		Owner:              args.Owner,
+		ProjectID:          args.ProjectID,
 		ParentID:           args.ParentID,
 		Labels:             args.Labels,
 		Ephemeral:          args.Ephemeral,

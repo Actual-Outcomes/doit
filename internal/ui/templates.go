@@ -45,7 +45,18 @@ const baseLayout = `<!DOCTYPE html>
       color: #fff;
       background: #334155;
     }
-    .nav-right { margin-left: auto; }
+    .nav-project { margin-left: auto; }
+    .nav-project select {
+      background: #334155;
+      color: #e2e8f0;
+      border: 1px solid #475569;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+    .nav-project select:hover { border-color: #64748b; }
+    .nav-right { margin-left: 0.75rem; }
     .nav-right form { display: inline; }
     .nav-right button {
       background: none;
@@ -257,6 +268,18 @@ const baseLayout = `<!DOCTYPE html>
     <a href="/ui/issues" {{if eq .NavActive "issues"}}class="active"{{end}}>Issues</a>
     <a href="/ui/ready" {{if eq .NavActive "ready"}}class="active"{{end}}>Ready</a>
   </div>
+  {{if .Projects}}
+  <div class="nav-project">
+    <form method="POST" action="/ui/project">
+      <select name="project_id" onchange="this.form.submit()">
+        <option value="">All Projects</option>
+        {{range .Projects}}
+        <option value="{{.ID}}" {{if eq (printf "%s" .ID) $.CurrentProject}}selected{{end}}>{{.Name}}</option>
+        {{end}}
+      </select>
+    </form>
+  </div>
+  {{end}}
   <div class="nav-right">
     <form method="POST" action="/ui/logout">
       <button type="submit">Logout</button>

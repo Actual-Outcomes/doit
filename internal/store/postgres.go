@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Actual-Outcomes/doit/internal/auth"
 	"github.com/Actual-Outcomes/doit/internal/model"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -171,14 +172,15 @@ func (s *PgStore) CreateIssue(ctx context.Context, input CreateIssueInput) (*mod
 	_, err = tx.Exec(ctx,
 		`INSERT INTO issues (id, content_hash, title, description, design, acceptance_criteria,
 		 notes, status, priority, issue_type, assignee, owner, created_at, created_by,
-		 updated_at, ephemeral, mol_type, work_type, wisp_type)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
+		 updated_at, ephemeral, mol_type, work_type, wisp_type, project_id)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
 		issue.ID, issue.ContentHash, issue.Title, issue.Description, issue.Design,
 		issue.AcceptanceCriteria, issue.Notes, issue.Status, issue.Priority,
 		issue.IssueType, nullEmpty(issue.Assignee), nullEmpty(issue.Owner),
 		issue.CreatedAt, nullEmpty(issue.CreatedBy), issue.UpdatedAt,
 		issue.Ephemeral, nullEmpty(string(issue.MolType)),
-		nullEmpty(string(issue.WorkType)), nullEmpty(string(issue.WispType)))
+		nullEmpty(string(issue.WorkType)), nullEmpty(string(issue.WispType)),
+		nullEmpty(input.ProjectID))
 	if err != nil {
 		return nil, fmt.Errorf("inserting issue: %w", err)
 	}
@@ -383,6 +385,9 @@ func (s *PgStore) ListIssues(ctx context.Context, filter model.IssueFilter) ([]m
 		args = append(args, *filter.ParentID)
 	}
 
+	// Project filter
+	query, args, argN = addProjectFilter(ctx, query, args, argN, "project_id")
+
 	// Sort
 	switch filter.SortBy {
 	case "priority":
@@ -434,6 +439,14 @@ func (s *PgStore) ListReady(ctx context.Context, filter model.IssueFilter) ([]mo
 		argN++
 		where = append(where, fmt.Sprintf("assignee = $%d", argN))
 		args = append(args, *filter.Assignee)
+	}
+
+	// Project filter
+	projectIDs := auth.AllowedProjectsFromContext(ctx)
+	if len(projectIDs) > 0 {
+		argN++
+		where = append(where, fmt.Sprintf("project_id = ANY($%d::uuid[])", argN))
+		args = append(args, projectIDs)
 	}
 
 	if len(where) > 0 {
@@ -737,7 +750,13 @@ func (s *PgStore) CountIssuesByStatus(ctx context.Context) (map[string]int, erro
 	ctx, cancel := s.withTimeout(ctx)
 	defer cancel()
 
-	rows, err := s.pool.Query(ctx, "SELECT status, COUNT(*) FROM issues GROUP BY status")
+	query := "SELECT status, COUNT(*) FROM issues WHERE 1=1"
+	args := []any{}
+	argN := 0
+	query, args, _ = addProjectFilter(ctx, query, args, argN, "project_id")
+	query += " GROUP BY status"
+
+	rows, err := s.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("counting issues by status: %w", err)
 	}

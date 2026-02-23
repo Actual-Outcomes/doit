@@ -11,6 +11,7 @@ type ctxKey int
 const (
 	ctxTenantID ctxKey = iota
 	ctxAdmin
+	ctxAllowedProjects
 )
 
 // WithTenant stores the tenant ID in the context.
@@ -33,4 +34,15 @@ func TenantFromContext(ctx context.Context) (uuid.UUID, bool) {
 func IsAdmin(ctx context.Context) bool {
 	v, _ := ctx.Value(ctxAdmin).(bool)
 	return v
+}
+
+// WithAllowedProjects stores the allowed project IDs in the context.
+func WithAllowedProjects(ctx context.Context, projectIDs []string) context.Context {
+	return context.WithValue(ctx, ctxAllowedProjects, projectIDs)
+}
+
+// AllowedProjectsFromContext returns the allowed project IDs if set.
+func AllowedProjectsFromContext(ctx context.Context) []string {
+	ids, _ := ctx.Value(ctxAllowedProjects).([]string)
+	return ids
 }
