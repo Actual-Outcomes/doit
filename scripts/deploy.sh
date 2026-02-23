@@ -35,9 +35,13 @@ echo "=== Logging into ECR ==="
 aws ecr get-login-password --region "$AWS_REGION" | \
   docker login --username AWS --password-stdin "$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
 
+# Resolve version from git tags
+VERSION=$(git describe --tags --always 2>/dev/null || echo "dev")
+echo "Version: $VERSION"
+
 # Build and push
 echo "=== Building Docker image ==="
-docker build -t "doit:$IMAGE_TAG" -f Dockerfile .
+docker build --build-arg "VERSION=$VERSION" -t "doit:$IMAGE_TAG" -f Dockerfile .
 
 echo "=== Pushing to ECR ==="
 docker tag "doit:$IMAGE_TAG" "$ECR_URL:$IMAGE_TAG"
