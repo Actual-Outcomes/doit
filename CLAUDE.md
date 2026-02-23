@@ -61,8 +61,10 @@ This project is tracked in AKL at `ama.aoendpoint.com`. The MCP config is in `.m
 
 **AKL project slug:** `doit`
 
-## Work Tracking (Beads)
-This project uses beads (`bd`) locally to track development work.
-- `bd ready` — see what's unblocked
-- `bd show <id>` — see task details
-- `bd update <id> --claim` — claim and start work
+## Work Tracking (Doit)
+This project uses its own doit MCP server at `din.aoendpoint.com` for tracking development work.
+- `doit_list_projects` — list available projects
+- `doit_ready` — see what's unblocked and ready for work
+- `doit_get_issue` — view issue details
+- `doit_update_issue` with claim=true — claim and start work
+- `doit_create_issue` — create new work items (set project_id)

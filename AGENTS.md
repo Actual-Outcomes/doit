@@ -1,16 +1,17 @@
 # Agent Instructions
 
-This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
+This project uses **doit** MCP server for issue tracking. The server is configured in `.mcp.json`.
 
 ## Quick Reference
 
-```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --status in_progress  # Claim work
-bd close <id>         # Complete work
-bd sync               # Sync with git
-```
+Use doit MCP tools (not CLI commands) for work tracking:
+
+- `doit_ready` — Find available work (unblocked issues)
+- `doit_get_issue` — View issue details
+- `doit_update_issue` with claim=true — Claim work
+- `doit_close_issue` — Complete work
+- `doit_create_issue` — Create new issues (set project_id)
+- `doit_list_projects` — List available projects
 
 ## Landing the Plane (Session Completion)
 
@@ -18,13 +19,12 @@ bd sync               # Sync with git
 
 **MANDATORY WORKFLOW:**
 
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
+1. **File issues for remaining work** - Create issues via `doit_create_issue`
 2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
+3. **Update issue status** - Close finished work via `doit_close_issue`, update in-progress items
 4. **PUSH TO REMOTE** - This is MANDATORY:
    ```bash
    git pull --rebase
-   bd sync
    git push
    git status  # MUST show "up to date with origin"
    ```
@@ -37,4 +37,3 @@ bd sync               # Sync with git
 - NEVER stop before pushing - that leaves work stranded locally
 - NEVER say "ready to push when you are" - YOU must push
 - If push fails, resolve and retry until it succeeds
-

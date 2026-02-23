@@ -16,3 +16,6 @@ Thumbs.db
 
 # Go
 vendor/
+
+# Beads (migrated to doit)
+.beads/

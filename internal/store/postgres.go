@@ -801,15 +801,15 @@ func scanIssueFromSingleRow(row pgx.Row) (*model.Issue, error) {
 	var metadata []byte
 	err := row.Scan(
 		&i.ID, &i.ContentHash, &i.Title, &i.Description, &i.Design,
-		&i.AcceptanceCriteria, &i.Notes, &i.SpecID, &i.Status, &i.Priority,
-		&i.IssueType, &i.Assignee, &i.Owner, &i.EstimatedMinutes,
-		&i.CreatedAt, &i.CreatedBy, &i.UpdatedAt, &i.ClosedAt, &i.DueAt, &i.DeferUntil,
-		&i.CloseReason, &i.ClosedBySession, &i.ExternalRef, &i.SourceSystem, &i.SourceRepo,
+		&i.AcceptanceCriteria, &i.Notes, &ns{(*string)(&i.SpecID)}, &i.Status, &i.Priority,
+		&ns{(*string)(&i.IssueType)}, &ns{&i.Assignee}, &ns{&i.Owner}, &i.EstimatedMinutes,
+		&i.CreatedAt, &ns{&i.CreatedBy}, &i.UpdatedAt, &i.ClosedAt, &i.DueAt, &i.DeferUntil,
+		&ns{&i.CloseReason}, &ns{&i.ClosedBySession}, &i.ExternalRef, &ns{&i.SourceSystem}, &ns{&i.SourceRepo},
 		&metadata, &i.CompactionLevel, &i.CompactedAt, &i.CompactedAtCommit, &i.OriginalSize,
-		&i.Sender, &i.Ephemeral, &i.MolType, &i.WorkType, &i.Crystallizes, &i.WispType,
-		&i.Pinned, &i.IsTemplate, &i.QualityScore, &i.EventKind, &i.Actor, &i.Target, &i.Payload,
-		&i.AwaitType, &i.AwaitID, &i.Timeout, &i.AgentState, &i.LastActivity, &i.RoleType, &i.Rig,
-		&i.HookBead, &i.RoleBead,
+		&ns{&i.Sender}, &i.Ephemeral, &ns{(*string)(&i.MolType)}, &ns{(*string)(&i.WorkType)}, &i.Crystallizes, &ns{(*string)(&i.WispType)},
+		&i.Pinned, &i.IsTemplate, &i.QualityScore, &ns{&i.EventKind}, &ns{&i.Actor}, &ns{&i.Target}, &ns{&i.Payload},
+		&ns{&i.AwaitType}, &ns{&i.AwaitID}, &ni64{(*int64)(&i.Timeout)}, &ns{(*string)(&i.AgentState)}, &i.LastActivity, &ns{&i.RoleType}, &ns{&i.Rig},
+		&ns{&i.HookBead}, &ns{&i.RoleBead},
 	)
 	if err != nil {
 		return nil, err
@@ -826,15 +826,15 @@ func scanIssueFromRow(rows pgx.Rows, extraFields ...any) (*model.Issue, error) {
 	scanArgs = append(scanArgs, extraFields...)
 	scanArgs = append(scanArgs,
 		&i.ID, &i.ContentHash, &i.Title, &i.Description, &i.Design,
-		&i.AcceptanceCriteria, &i.Notes, &i.SpecID, &i.Status, &i.Priority,
-		&i.IssueType, &i.Assignee, &i.Owner, &i.EstimatedMinutes,
-		&i.CreatedAt, &i.CreatedBy, &i.UpdatedAt, &i.ClosedAt, &i.DueAt, &i.DeferUntil,
-		&i.CloseReason, &i.ClosedBySession, &i.ExternalRef, &i.SourceSystem, &i.SourceRepo,
+		&i.AcceptanceCriteria, &i.Notes, &ns{(*string)(&i.SpecID)}, &i.Status, &i.Priority,
+		&ns{(*string)(&i.IssueType)}, &ns{&i.Assignee}, &ns{&i.Owner}, &i.EstimatedMinutes,
+		&i.CreatedAt, &ns{&i.CreatedBy}, &i.UpdatedAt, &i.ClosedAt, &i.DueAt, &i.DeferUntil,
+		&ns{&i.CloseReason}, &ns{&i.ClosedBySession}, &i.ExternalRef, &ns{&i.SourceSystem}, &ns{&i.SourceRepo},
 		&metadata, &i.CompactionLevel, &i.CompactedAt, &i.CompactedAtCommit, &i.OriginalSize,
-		&i.Sender, &i.Ephemeral, &i.MolType, &i.WorkType, &i.Crystallizes, &i.WispType,
-		&i.Pinned, &i.IsTemplate, &i.QualityScore, &i.EventKind, &i.Actor, &i.Target, &i.Payload,
-		&i.AwaitType, &i.AwaitID, &i.Timeout, &i.AgentState, &i.LastActivity, &i.RoleType, &i.Rig,
-		&i.HookBead, &i.RoleBead,
+		&ns{&i.Sender}, &i.Ephemeral, &ns{(*string)(&i.MolType)}, &ns{(*string)(&i.WorkType)}, &i.Crystallizes, &ns{(*string)(&i.WispType)},
+		&i.Pinned, &i.IsTemplate, &i.QualityScore, &ns{&i.EventKind}, &ns{&i.Actor}, &ns{&i.Target}, &ns{&i.Payload},
+		&ns{&i.AwaitType}, &ns{&i.AwaitID}, &ni64{(*int64)(&i.Timeout)}, &ns{(*string)(&i.AgentState)}, &i.LastActivity, &ns{&i.RoleType}, &ns{&i.Rig},
+		&ns{&i.HookBead}, &ns{&i.RoleBead},
 	)
 
 	if err := rows.Scan(scanArgs...); err != nil {
@@ -896,4 +896,94 @@ func nullEmpty(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+// ns wraps a *string to scan nullable TEXT columns into a Go string.
+// NULL values become empty strings.
+type ns struct {
+	target *string
+}
+
+func (n *ns) Scan(src any) error {
+	if src == nil {
+		*n.target = ""
+		return nil
+	}
+	switch v := src.(type) {
+	case string:
+		*n.target = v
+	case []byte:
+		*n.target = string(v)
+	default:
+		return fmt.Errorf("ns.Scan: unsupported type %T", src)
+	}
+	return nil
+}
+
+// ni64 wraps a *int64 to scan nullable BIGINT columns into a Go int64.
+// NULL values become 0.
+type ni64 struct {
+	target *int64
+}
+
+func (n *ni64) Scan(src any) error {
+	if src == nil {
+		*n.target = 0
+		return nil
+	}
+	switch v := src.(type) {
+	case int64:
+		*n.target = v
+	case int32:
+		*n.target = int64(v)
+	case float64:
+		*n.target = int64(v)
+	default:
+		return fmt.Errorf("ni64.Scan: unsupported type %T", src)
+	}
+	return nil
+}
+
+// ni wraps a *int to scan nullable INT columns into a Go int.
+// NULL values become 0.
+type ni struct {
+	target *int
+}
+
+func (n *ni) Scan(src any) error {
+	if src == nil {
+		*n.target = 0
+		return nil
+	}
+	switch v := src.(type) {
+	case int64:
+		*n.target = int(v)
+	case int32:
+		*n.target = int(v)
+	case float64:
+		*n.target = int(v)
+	default:
+		return fmt.Errorf("ni.Scan: unsupported type %T", src)
+	}
+	return nil
+}
+
+// nb wraps a *bool to scan nullable BOOLEAN columns into a Go bool.
+// NULL values become false.
+type nb struct {
+	target *bool
+}
+
+func (n *nb) Scan(src any) error {
+	if src == nil {
+		*n.target = false
+		return nil
+	}
+	switch v := src.(type) {
+	case bool:
+		*n.target = v
+	default:
+		return fmt.Errorf("nb.Scan: unsupported type %T", src)
+	}
+	return nil
 }

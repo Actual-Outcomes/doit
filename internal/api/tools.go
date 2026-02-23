@@ -57,6 +57,14 @@ func (h *Handlers) CreateIssue(ctx context.Context, _ *mcp.CallToolRequest, args
 		issueType = model.TypeTask
 	}
 
+	createdBy := args.Owner
+	if createdBy == "" {
+		createdBy = args.Assignee
+	}
+	if createdBy == "" {
+		createdBy = "system"
+	}
+
 	issue, err := h.store.CreateIssue(ctx, store.CreateIssueInput{
 		ID:                 id,
 		Title:              args.Title,
@@ -69,6 +77,7 @@ func (h *Handlers) CreateIssue(ctx context.Context, _ *mcp.CallToolRequest, args
 		IssueType:          issueType,
 		Assignee:           args.Assignee,
 		Owner:              args.Owner,
+		CreatedBy:          createdBy,
 		ProjectID:          args.ProjectID,
 		ParentID:           args.ParentID,
 		Labels:             args.Labels,
