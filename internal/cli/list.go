@@ -16,6 +16,7 @@ func newListCmd() *cobra.Command {
 		issueType string
 		priority  int
 		assignee  string
+		projectID string
 		limit     int
 		sortBy    string
 	)
@@ -54,6 +55,9 @@ func newListCmd() *cobra.Command {
 			if assignee != "" {
 				filter.Assignee = &assignee
 			}
+			if projectID != "" {
+				filter.ProjectID = &projectID
+			}
 
 			issues, err := pg.ListIssues(ctx, filter)
 			if err != nil {
@@ -91,6 +95,7 @@ func newListCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&issueType, "type", "t", "", "Filter by type")
 	cmd.Flags().IntVarP(&priority, "priority", "p", -1, "Filter by priority")
 	cmd.Flags().StringVarP(&assignee, "assignee", "a", "", "Filter by assignee")
+	cmd.Flags().StringVar(&projectID, "project", "", "Filter by project ID")
 	cmd.Flags().IntVarP(&limit, "limit", "l", 50, "Max results")
 	cmd.Flags().StringVar(&sortBy, "sort", "hybrid", "Sort by: priority, oldest, updated, hybrid")
 

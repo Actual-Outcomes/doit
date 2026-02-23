@@ -208,6 +208,9 @@ type Issue struct {
 	HookBead     string     `json:"hook_bead,omitempty" db:"hook_bead"`
 	RoleBead     string     `json:"role_bead,omitempty" db:"role_bead"`
 
+	// Project
+	ProjectID string `json:"project_id,omitempty" db:"project_id"`
+
 	// Denormalized fields (populated by queries, not stored directly)
 	Labels       []string     `json:"labels,omitempty" db:"-"`
 	Dependencies []Dependency `json:"dependencies,omitempty" db:"-"`
@@ -280,6 +283,7 @@ type IssueFilter struct {
 	Assignee     *string    `json:"assignee,omitempty"`
 	Owner        *string    `json:"owner,omitempty"`
 	ParentID     *string    `json:"parent_id,omitempty"`
+	ProjectID    *string    `json:"project_id,omitempty"`
 	Labels       []string   `json:"labels,omitempty"`       // AND match
 	LabelsAny    []string   `json:"labels_any,omitempty"`   // OR match
 	Search       *string    `json:"search,omitempty"`        // title/description search

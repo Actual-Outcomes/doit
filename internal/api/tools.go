@@ -150,6 +150,7 @@ type listIssuesArgs struct {
 	IssueType string `json:"issue_type"`
 	Priority  *int   `json:"priority"`
 	Assignee  string `json:"assignee"`
+	ProjectID string `json:"project_id"`
 	Limit     int    `json:"limit"`
 	SortBy    string `json:"sort_by"`
 }
@@ -172,6 +173,9 @@ func (h *Handlers) ListIssues(ctx context.Context, _ *mcp.CallToolRequest, args 
 	}
 	if args.Assignee != "" {
 		filter.Assignee = &args.Assignee
+	}
+	if args.ProjectID != "" {
+		filter.ProjectID = &args.ProjectID
 	}
 	if filter.Limit == 0 {
 		filter.Limit = 50
@@ -196,7 +200,8 @@ func (h *Handlers) DeleteIssue(ctx context.Context, _ *mcp.CallToolRequest, args
 }
 
 type readyArgs struct {
-	Limit int `json:"limit"`
+	Limit     int    `json:"limit"`
+	ProjectID string `json:"project_id"`
 }
 
 func (h *Handlers) Ready(ctx context.Context, _ *mcp.CallToolRequest, args readyArgs) (*mcp.CallToolResult, any, error) {
@@ -204,7 +209,11 @@ func (h *Handlers) Ready(ctx context.Context, _ *mcp.CallToolRequest, args ready
 	if limit == 0 {
 		limit = 20
 	}
-	issues, err := h.store.ListReady(ctx, model.IssueFilter{Limit: limit})
+	filter := model.IssueFilter{Limit: limit}
+	if args.ProjectID != "" {
+		filter.ProjectID = &args.ProjectID
+	}
+	issues, err := h.store.ListReady(ctx, filter)
 	if err != nil {
 		return errResult(err)
 	}

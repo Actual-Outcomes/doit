@@ -11,7 +11,10 @@ import (
 )
 
 func newReadyCmd() *cobra.Command {
-	var limit int
+	var (
+		limit     int
+		projectID string
+	)
 
 	cmd := &cobra.Command{
 		Use:   "ready",
@@ -29,7 +32,11 @@ func newReadyCmd() *cobra.Command {
 			}
 			defer pg.Close()
 
-			issues, err := pg.ListReady(ctx, model.IssueFilter{Limit: limit})
+			filter := model.IssueFilter{Limit: limit}
+			if projectID != "" {
+				filter.ProjectID = &projectID
+			}
+			issues, err := pg.ListReady(ctx, filter)
 			if err != nil {
 				return fmt.Errorf("listing ready issues: %w", err)
 			}
@@ -54,6 +61,7 @@ func newReadyCmd() *cobra.Command {
 	}
 
 	cmd.Flags().IntVarP(&limit, "limit", "l", 20, "Max results")
+	cmd.Flags().StringVar(&projectID, "project", "", "Filter by project ID")
 
 	return cmd
 }

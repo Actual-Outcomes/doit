@@ -28,7 +28,8 @@ func RegisterTools(server *mcp.Server, h *Handlers) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "doit_list_issues",
 		Description: "List issues with filtering by status, type, priority, assignee, and labels. " +
-			"Supports sorting by priority, oldest, updated, or hybrid.",
+			"Supports sorting by priority, oldest, updated, or hybrid. " +
+			"Use project_id to scope results to a single project.",
 	}, h.ListIssues)
 
 	mcp.AddTool(server, &mcp.Tool{
@@ -41,7 +42,8 @@ func RegisterTools(server *mcp.Server, h *Handlers) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "doit_ready",
 		Description: "List issues ready for work — open, not blocked, not deferred. " +
-			"Call this to find the next task to work on.",
+			"Call this to find the next task to work on. " +
+			"Use project_id to scope results to a single project.",
 	}, h.Ready)
 
 	// --- Dependencies ---

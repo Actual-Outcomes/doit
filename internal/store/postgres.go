@@ -164,6 +164,7 @@ func (s *PgStore) CreateIssue(ctx context.Context, input CreateIssueInput) (*mod
 		MolType:   input.MolType,
 		WorkType:  input.WorkType,
 		WispType:  input.WispType,
+		ProjectID: input.ProjectID,
 	}
 
 	// Compute content hash
@@ -384,8 +385,11 @@ func (s *PgStore) ListIssues(ctx context.Context, filter model.IssueFilter) ([]m
 		query += fmt.Sprintf(` AND id IN (SELECT issue_id FROM dependencies WHERE depends_on_id = $%d AND type = 'parent-child')`, argN)
 		args = append(args, *filter.ParentID)
 	}
+	if filter.ProjectID != nil {
+		addWhere("project_id = $%d::uuid", *filter.ProjectID)
+	}
 
-	// Project filter
+	// Project filter (context-based auto-filter for allowed projects)
 	query, args, argN = addProjectFilter(ctx, query, args, argN, "project_id")
 
 	// Sort
@@ -440,8 +444,13 @@ func (s *PgStore) ListReady(ctx context.Context, filter model.IssueFilter) ([]mo
 		where = append(where, fmt.Sprintf("assignee = $%d", argN))
 		args = append(args, *filter.Assignee)
 	}
+	if filter.ProjectID != nil {
+		argN++
+		where = append(where, fmt.Sprintf("project_id = $%d::uuid", argN))
+		args = append(args, *filter.ProjectID)
+	}
 
-	// Project filter
+	// Project filter (context-based auto-filter for allowed projects)
 	projectIDs := auth.AllowedProjectsFromContext(ctx)
 	if len(projectIDs) > 0 {
 		argN++
@@ -784,7 +793,7 @@ const issueColumns = `id, content_hash, title, description, design, acceptance_c
 	sender, ephemeral, mol_type, work_type, crystallizes, wisp_type,
 	pinned, is_template, quality_score, event_kind, actor, target, payload,
 	await_type, await_id, timeout_ns, agent_state, last_activity, role_type, rig,
-	hook_bead, role_bead`
+	hook_bead, role_bead, project_id`
 
 type querier interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
@@ -809,7 +818,7 @@ func scanIssueFromSingleRow(row pgx.Row) (*model.Issue, error) {
 		&ns{&i.Sender}, &i.Ephemeral, &ns{(*string)(&i.MolType)}, &ns{(*string)(&i.WorkType)}, &i.Crystallizes, &ns{(*string)(&i.WispType)},
 		&i.Pinned, &i.IsTemplate, &i.QualityScore, &ns{&i.EventKind}, &ns{&i.Actor}, &ns{&i.Target}, &ns{&i.Payload},
 		&ns{&i.AwaitType}, &ns{&i.AwaitID}, &ni64{(*int64)(&i.Timeout)}, &ns{(*string)(&i.AgentState)}, &i.LastActivity, &ns{&i.RoleType}, &ns{&i.Rig},
-		&ns{&i.HookBead}, &ns{&i.RoleBead},
+		&ns{&i.HookBead}, &ns{&i.RoleBead}, &ns{&i.ProjectID},
 	)
 	if err != nil {
 		return nil, err
@@ -822,7 +831,7 @@ func scanIssueFromRow(rows pgx.Rows, extraFields ...any) (*model.Issue, error) {
 	var i model.Issue
 	var metadata []byte
 
-	scanArgs := make([]any, 0, len(extraFields)+52)
+	scanArgs := make([]any, 0, len(extraFields)+53)
 	scanArgs = append(scanArgs, extraFields...)
 	scanArgs = append(scanArgs,
 		&i.ID, &i.ContentHash, &i.Title, &i.Description, &i.Design,
@@ -834,7 +843,7 @@ func scanIssueFromRow(rows pgx.Rows, extraFields ...any) (*model.Issue, error) {
 		&ns{&i.Sender}, &i.Ephemeral, &ns{(*string)(&i.MolType)}, &ns{(*string)(&i.WorkType)}, &i.Crystallizes, &ns{(*string)(&i.WispType)},
 		&i.Pinned, &i.IsTemplate, &i.QualityScore, &ns{&i.EventKind}, &ns{&i.Actor}, &ns{&i.Target}, &ns{&i.Payload},
 		&ns{&i.AwaitType}, &ns{&i.AwaitID}, &ni64{(*int64)(&i.Timeout)}, &ns{(*string)(&i.AgentState)}, &i.LastActivity, &ns{&i.RoleType}, &ns{&i.Rig},
-		&ns{&i.HookBead}, &ns{&i.RoleBead},
+		&ns{&i.HookBead}, &ns{&i.RoleBead}, &ns{&i.ProjectID},
 	)
 
 	if err := rows.Scan(scanArgs...); err != nil {

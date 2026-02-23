@@ -6,8 +6,9 @@ This project uses **doit** MCP server for issue tracking. The server is configur
 
 Use doit MCP tools (not CLI commands) for work tracking:
 
-- `doit_ready` — Find available work (unblocked issues)
-- `doit_get_issue` — View issue details
+- `doit_ready` — Find available work (unblocked issues). Use `project_id` to scope to a project.
+- `doit_list_issues` — List/filter issues. Use `project_id` to scope to a project.
+- `doit_get_issue` — View issue details (includes project_id)
 - `doit_update_issue` with claim=true — Claim work
 - `doit_close_issue` — Complete work
 - `doit_create_issue` — Create new issues (set project_id)
