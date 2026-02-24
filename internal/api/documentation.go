@@ -134,14 +134,14 @@ This project uses Doit for persistent work tracking via MCP.
   <tr><td><code>doit_create_issue</code></td><td>Create a new work item (task, bug, feature, epic, etc). Returns the created issue with its hash-based ID. Use <code>parent_id</code> to create a hierarchical child (e.g. epic.1). Use <code>project</code> (slug) to assign to a project.</td></tr>
   <tr><td><code>doit_get_issue</code></td><td>Get full details of an issue including labels, dependencies, and parent.</td></tr>
   <tr><td><code>doit_update_issue</code></td><td>Update fields on an existing issue. Only specified fields are changed. Use claim=true to atomically set assignee and status to in_progress.</td></tr>
-  <tr><td><code>doit_list_issues</code></td><td>List issues with filtering by status, type, priority, assignee, and labels. Supports sorting by priority, oldest, updated, or hybrid. Use <code>project</code> (slug) to scope results to a single project.</td></tr>
+  <tr><td><code>doit_list_issues</code></td><td>List issues with filtering by status, type, priority, assignee, and labels. Supports sorting by priority, oldest, updated, or hybrid. Use <code>project</code> (slug) to scope results. Set <code>compact=true</code> to return only id, title, type, status, priority, assignee, owner, labels.</td></tr>
   <tr><td><code>doit_delete_issue</code></td><td>Delete an issue. Cascades to dependencies, labels, comments, and events.</td></tr>
 </table>
 
 <h3>Ready Detection</h3>
 <table>
   <tr><th>Tool</th><th>Description</th></tr>
-  <tr><td><code>doit_ready</code></td><td>List issues ready for work — open, not blocked, not deferred. Call this to find the next task to work on. Use <code>project</code> (slug) to scope results to a single project.</td></tr>
+  <tr><td><code>doit_ready</code></td><td>List issues ready for work — open, not blocked, not deferred. Call this to find the next task to work on. Use <code>project</code> (slug) to scope results. Set <code>compact=true</code> to return only id, title, type, status, priority, assignee, owner, labels.</td></tr>
 </table>
 
 <h3>Dependencies</h3>

@@ -217,6 +217,44 @@ type Issue struct {
 	ParentID     string       `json:"parent_id,omitempty" db:"-"`
 }
 
+// CompactIssue is a minimal representation of an Issue for list responses.
+// Used when compact=true to save context window tokens.
+type CompactIssue struct {
+	ID        string    `json:"id"`
+	Title     string    `json:"title"`
+	IssueType IssueType `json:"issue_type"`
+	Status    Status    `json:"status"`
+	Priority  int       `json:"priority"`
+	Assignee  string    `json:"assignee,omitempty"`
+	Owner     string    `json:"owner,omitempty"`
+	ProjectID string    `json:"project_id,omitempty"`
+	Labels    []string  `json:"labels,omitempty"`
+}
+
+// ToCompact returns a minimal representation of the issue.
+func (i *Issue) ToCompact() CompactIssue {
+	return CompactIssue{
+		ID:        i.ID,
+		Title:     i.Title,
+		IssueType: i.IssueType,
+		Status:    i.Status,
+		Priority:  i.Priority,
+		Assignee:  i.Assignee,
+		Owner:     i.Owner,
+		ProjectID: i.ProjectID,
+		Labels:    i.Labels,
+	}
+}
+
+// ToCompactList converts a slice of Issues to CompactIssues.
+func ToCompactList(issues []Issue) []CompactIssue {
+	out := make([]CompactIssue, len(issues))
+	for i := range issues {
+		out[i] = issues[i].ToCompact()
+	}
+	return out
+}
+
 // Dependency represents a directed relationship between two issues.
 type Dependency struct {
 	IssueID     string         `json:"issue_id" db:"issue_id"`

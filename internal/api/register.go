@@ -29,7 +29,8 @@ func RegisterAgentTools(server *mcp.Server, h *Handlers) {
 		Name: "doit_list_issues",
 		Description: "List issues with filtering by status, type, priority, assignee, and labels. " +
 			"Supports sorting by priority, oldest, updated, or hybrid. " +
-			"Use project slug to scope results to a single project.",
+			"Use project slug to scope results to a single project. " +
+			"Set compact=true for minimal responses that save context window tokens.",
 	}, h.ListIssues)
 
 	mcp.AddTool(server, &mcp.Tool{
@@ -43,7 +44,8 @@ func RegisterAgentTools(server *mcp.Server, h *Handlers) {
 		Name: "doit_ready",
 		Description: "List issues ready for work — open, not blocked, not deferred. " +
 			"Call this to find the next task to work on. " +
-			"Use project slug to scope results to a single project.",
+			"Use project slug to scope results to a single project. " +
+			"Set compact=true for minimal responses that save context window tokens.",
 	}, h.Ready)
 
 	// --- Dependencies ---
