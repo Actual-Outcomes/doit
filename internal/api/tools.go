@@ -187,7 +187,7 @@ type listIssuesArgs struct {
 	Project   *string `json:"project"`
 	Limit     int     `json:"limit"`
 	SortBy    string  `json:"sort_by"`
-	Compact   *bool   `json:"compact"`
+	Compact   bool    `json:"compact,omitempty"`
 }
 
 func (h *Handlers) ListIssues(ctx context.Context, _ *mcp.CallToolRequest, args listIssuesArgs) (*mcp.CallToolResult, any, error) {
@@ -224,7 +224,7 @@ func (h *Handlers) ListIssues(ctx context.Context, _ *mcp.CallToolRequest, args 
 	if err != nil {
 		return errResult(err)
 	}
-	if args.Compact != nil && *args.Compact {
+	if args.Compact {
 		return jsonResult(model.ToCompactList(issues))
 	}
 	return jsonResult(issues)
@@ -244,7 +244,7 @@ func (h *Handlers) DeleteIssue(ctx context.Context, _ *mcp.CallToolRequest, args
 type readyArgs struct {
 	Limit   int     `json:"limit"`
 	Project *string `json:"project"`
-	Compact *bool   `json:"compact"`
+	Compact bool    `json:"compact,omitempty"`
 }
 
 func (h *Handlers) Ready(ctx context.Context, _ *mcp.CallToolRequest, args readyArgs) (*mcp.CallToolResult, any, error) {
@@ -264,7 +264,7 @@ func (h *Handlers) Ready(ctx context.Context, _ *mcp.CallToolRequest, args ready
 	if err != nil {
 		return errResult(err)
 	}
-	if args.Compact != nil && *args.Compact {
+	if args.Compact {
 		return jsonResult(model.ToCompactList(issues))
 	}
 	return jsonResult(issues)
