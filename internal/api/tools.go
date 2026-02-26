@@ -188,6 +188,7 @@ type listIssuesArgs struct {
 	Limit     int     `json:"limit"`
 	SortBy    string  `json:"sort_by"`
 	Compact   bool    `json:"compact,omitempty"`
+	Pinned    bool    `json:"pinned,omitempty"`
 }
 
 func (h *Handlers) ListIssues(ctx context.Context, _ *mcp.CallToolRequest, args listIssuesArgs) (*mcp.CallToolResult, any, error) {
@@ -215,6 +216,10 @@ func (h *Handlers) ListIssues(ctx context.Context, _ *mcp.CallToolRequest, args 
 			return errResult(err)
 		}
 		filter.ProjectID = &resolved
+	}
+	if args.Pinned {
+		t := true
+		filter.Pinned = &t
 	}
 	if filter.Limit == 0 {
 		filter.Limit = 50

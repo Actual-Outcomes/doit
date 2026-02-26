@@ -30,7 +30,8 @@ func RegisterAgentTools(server *mcp.Server, h *Handlers) {
 		Description: "List issues with filtering by status, type, priority, assignee, and labels. " +
 			"Supports sorting by priority, oldest, updated, or hybrid. " +
 			"Use project slug to scope results to a single project. " +
-			"Set compact=true for minimal responses that save context window tokens.",
+			"Set compact=true for minimal responses that save context window tokens. " +
+			"Set pinned=true to retrieve only pinned issues for fast orientation.",
 	}, h.ListIssues)
 
 	mcp.AddTool(server, &mcp.Tool{
