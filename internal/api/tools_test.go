@@ -240,6 +240,17 @@ func (m *mockStore) ListAPIKeys(_ context.Context, _ string) ([]model.APIKeyInfo
 	return nil, nil
 }
 
+func (m *mockStore) UpdateProject(_ context.Context, projectID string, name, slug *string) (*model.Project, error) {
+	p := &model.Project{ID: uuid.MustParse(projectID)}
+	if name != nil {
+		p.Name = *name
+	}
+	if slug != nil {
+		p.Slug = *slug
+	}
+	return p, nil
+}
+
 func (m *mockStore) Close() {}
 
 // --- Tests ---

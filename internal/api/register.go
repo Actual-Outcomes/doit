@@ -139,7 +139,7 @@ func RegisterAgentTools(server *mcp.Server, h *Handlers) {
 
 }
 
-// RegisterAdminTools registers admin-only MCP tools (5 tools).
+// RegisterAdminTools registers admin-only MCP tools (6 tools).
 func RegisterAdminTools(server *mcp.Server, h *Handlers) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "doit_create_tenant",
@@ -167,4 +167,10 @@ func RegisterAdminTools(server *mcp.Server, h *Handlers) {
 		Name: "doit_list_api_keys",
 		Description: "List all API keys for a tenant. Requires admin API key.",
 	}, h.ListAPIKeys)
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "doit_update_project",
+		Description: "Update a project's name or slug. Requires admin API key. " +
+			"Accepts project ID or slug as identifier.",
+	}, h.AdminUpdateProject)
 }

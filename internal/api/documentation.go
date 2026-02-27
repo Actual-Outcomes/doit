@@ -188,7 +188,7 @@ This project uses Doit for persistent work tracking via MCP.
   <tr><td><code>doit_resolve_lesson</code></td><td>Mark a lesson as resolved after the correction has been applied.</td></tr>
 </table>
 
-<h2>Admin Tools (5)</h2>
+<h2>Admin Tools (6)</h2>
 <p>Available on <code>POST /admin/mcp</code> — requires admin API key. Tenant keys receive 403.</p>
 
 <h3>Tenant Management</h3>
@@ -199,6 +199,12 @@ This project uses Doit for persistent work tracking via MCP.
   <tr><td><code>doit_create_api_key</code></td><td>Generate a new API key for a tenant. The raw key is returned once and cannot be retrieved again.</td></tr>
   <tr><td><code>doit_revoke_api_key</code></td><td>Revoke an API key by its 8-character prefix.</td></tr>
   <tr><td><code>doit_list_api_keys</code></td><td>List all API keys for a tenant.</td></tr>
+</table>
+
+<h3>Project Management</h3>
+<table>
+  <tr><th>Tool</th><th>Description</th></tr>
+  <tr><td><code>doit_update_project</code></td><td>Update a project's name or slug. Accepts project ID or current slug as <code>project</code> identifier. Provide <code>name</code> and/or <code>slug</code> to change.</td></tr>
 </table>
 
 <h2>Data Model</h2>
@@ -263,7 +269,7 @@ This project uses Doit for persistent work tracking via MCP.
   <tr><th>Endpoint</th><th>Auth</th><th>Description</th></tr>
   <tr><td><code>GET /health</code></td><td>None</td><td>Health check</td></tr>
   <tr><td><code>POST /mcp</code></td><td>Bearer token</td><td>Agent MCP server (20 tools)</td></tr>
-  <tr><td><code>POST /admin/mcp</code></td><td>Admin key</td><td>Admin MCP server (5 tools)</td></tr>
+  <tr><td><code>POST /admin/mcp</code></td><td>Admin key</td><td>Admin MCP server (6 tools)</td></tr>
   <tr><td><code>GET /documentation</code></td><td>None</td><td>This page</td></tr>
   <tr><td><code>GET /ui/</code></td><td>Session cookie</td><td>Web UI (login with API key)</td></tr>
 </table>

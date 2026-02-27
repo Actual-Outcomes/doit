@@ -55,7 +55,7 @@ func main() {
 	}
 	defer pgStore.Close()
 
-	// MCP servers: agent (23 tools) + admin (5 tools)
+	// MCP servers: agent (23 tools) + admin (6 tools)
 	agentMCP := mcp.NewServer(&mcp.Implementation{
 		Name:    "doit-mcp",
 		Version: version.Number,

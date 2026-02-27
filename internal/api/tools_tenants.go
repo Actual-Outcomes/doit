@@ -86,3 +86,21 @@ func (h *Handlers) ListAPIKeys(ctx context.Context, _ *mcp.CallToolRequest, args
 	}
 	return jsonResult(keys)
 }
+
+type updateProjectArgs struct {
+	Project string  `json:"project"`
+	Name    *string `json:"name,omitempty"`
+	Slug    *string `json:"slug,omitempty"`
+}
+
+func (h *Handlers) AdminUpdateProject(ctx context.Context, _ *mcp.CallToolRequest, args updateProjectArgs) (*mcp.CallToolResult, any, error) {
+	projectID, err := resolveProjectSlug(ctx, h.store, args.Project)
+	if err != nil {
+		return errResult(err)
+	}
+	project, err := h.store.UpdateProject(ctx, projectID, args.Name, args.Slug)
+	if err != nil {
+		return errResult(err)
+	}
+	return jsonResult(project)
+}
