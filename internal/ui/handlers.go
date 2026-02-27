@@ -1,7 +1,9 @@
 package ui
 
 import (
+	"crypto/rand"
 	"crypto/subtle"
+	"encoding/hex"
 	"fmt"
 	"html/template"
 	"log/slog"
@@ -36,12 +38,16 @@ func NewUIHandlers(s store.Store, signingKey, adminKey string, adminTenantID *uu
 	}
 
 	pages := map[string]string{
-		"login":       loginPage,
-		"dashboard":   dashboardPage,
-		"issues":      issuesPage,
-		"issueDetail": issueDetailPage,
-		"ready":       readyPage,
-		"error":       errorPage,
+		"login":          loginPage,
+		"dashboard":      dashboardPage,
+		"issues":         issuesPage,
+		"issueDetail":    issueDetailPage,
+		"ready":          readyPage,
+		"error":          errorPage,
+		"adminDashboard": adminDashboardPage,
+		"adminTenants":   adminTenantsPage,
+		"adminAPIKeys":   adminAPIKeysPage,
+		"adminProjects":  adminProjectsPage,
 	}
 
 	base := template.Must(template.New("base").Funcs(templateFuncs).Parse(baseLayout))
@@ -109,7 +115,7 @@ func (h *UIHandlers) LoginSubmit(w http.ResponseWriter, r *http.Request) {
 	// Check admin key first
 	if h.adminKey != "" && subtle.ConstantTimeCompare([]byte(apiKey), []byte(h.adminKey)) == 1 {
 		if h.adminTenantID != nil {
-			setSessionCookie(w, *h.adminTenantID, h.signingKey)
+			setSessionCookie(w, *h.adminTenantID, true, h.signingKey)
 			http.Redirect(w, r, "/ui/", http.StatusFound)
 			return
 		}
@@ -127,7 +133,7 @@ func (h *UIHandlers) LoginSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	setSessionCookie(w, tenantID, h.signingKey)
+	setSessionCookie(w, tenantID, false, h.signingKey)
 	http.Redirect(w, r, "/ui/", http.StatusFound)
 }
 
@@ -149,6 +155,7 @@ func (h *UIHandlers) addProjectData(r *http.Request, data map[string]any) {
 	}
 	data["Projects"] = projects
 	data["CurrentProject"] = getProjectCookie(r)
+	data["IsAdmin"] = h.isAdminFromRequest(r)
 }
 
 // tenantIDFromRequest extracts the tenant ID from the session cookie.
@@ -162,6 +169,19 @@ func (h *UIHandlers) tenantIDFromRequest(r *http.Request) uuid.UUID {
 		return uuid.Nil
 	}
 	return sess.TenantID
+}
+
+// isAdminFromRequest checks if the current session belongs to an admin.
+func (h *UIHandlers) isAdminFromRequest(r *http.Request) bool {
+	cookie, err := r.Cookie(sessionCookieName)
+	if err != nil {
+		return false
+	}
+	sess, err := verifyCookie(cookie.Value, h.signingKey)
+	if err != nil {
+		return false
+	}
+	return sess.IsAdmin
 }
 
 // ProjectSwitch handles POST /ui/project to switch the active project.
@@ -373,6 +393,209 @@ func truncate(s string, n int) string {
 		return s
 	}
 	return s[:n] + "..."
+}
+
+// --- Admin handlers ---
+
+// AdminDashboard shows the admin overview page.
+func (h *UIHandlers) AdminDashboard(w http.ResponseWriter, r *http.Request) {
+	tenants, err := h.store.ListTenants(r.Context())
+	if err != nil {
+		slog.Error("admin dashboard: list tenants failed", "error", err)
+		tenants = nil
+	}
+	projects, err := h.store.ListAllProjects(r.Context())
+	if err != nil {
+		slog.Error("admin dashboard: list projects failed", "error", err)
+		projects = nil
+	}
+
+	data := map[string]any{
+		"Title":     "Admin",
+		"ShowNav":   true,
+		"NavActive": "admin",
+		"IsAdmin":   true,
+		"Tenants":   tenants,
+		"Projects":  projects,
+	}
+	h.render(w, "adminDashboard", data)
+}
+
+// AdminTenants shows the tenant list with create form.
+func (h *UIHandlers) AdminTenants(w http.ResponseWriter, r *http.Request) {
+	tenants, err := h.store.ListTenants(r.Context())
+	if err != nil {
+		slog.Error("admin tenants: list failed", "error", err)
+		h.renderError(w, http.StatusInternalServerError, "Failed to load tenants.")
+		return
+	}
+
+	data := map[string]any{
+		"Title":     "Tenants",
+		"ShowNav":   true,
+		"NavActive": "admin",
+		"IsAdmin":   true,
+		"Tenants":   tenants,
+		"Error":     r.URL.Query().Get("error"),
+		"Success":   r.URL.Query().Get("success"),
+	}
+	h.render(w, "adminTenants", data)
+}
+
+// AdminCreateTenant handles POST to create a tenant.
+func (h *UIHandlers) AdminCreateTenant(w http.ResponseWriter, r *http.Request) {
+	name := strings.TrimSpace(r.FormValue("name"))
+	slug := strings.TrimSpace(r.FormValue("slug"))
+
+	if name == "" || slug == "" {
+		http.Redirect(w, r, "/ui/admin/tenants?error=Name+and+slug+are+required", http.StatusFound)
+		return
+	}
+
+	_, err := h.store.CreateTenant(r.Context(), name, slug)
+	if err != nil {
+		slog.Error("admin create tenant failed", "error", err)
+		http.Redirect(w, r, "/ui/admin/tenants?error="+err.Error(), http.StatusFound)
+		return
+	}
+
+	http.Redirect(w, r, "/ui/admin/tenants?success=Tenant+created", http.StatusFound)
+}
+
+// AdminAPIKeys shows API keys for a tenant.
+func (h *UIHandlers) AdminAPIKeys(w http.ResponseWriter, r *http.Request) {
+	tenantSlug := chi.URLParam(r, "slug")
+
+	keys, err := h.store.ListAPIKeys(r.Context(), tenantSlug)
+	if err != nil {
+		slog.Error("admin api keys: list failed", "error", err)
+		h.renderError(w, http.StatusInternalServerError, "Failed to load API keys.")
+		return
+	}
+
+	data := map[string]any{
+		"Title":      "API Keys — " + tenantSlug,
+		"ShowNav":    true,
+		"NavActive":  "admin",
+		"IsAdmin":    true,
+		"TenantSlug": tenantSlug,
+		"Keys":       keys,
+		"Error":      r.URL.Query().Get("error"),
+		"Success":    r.URL.Query().Get("success"),
+		"NewKey":     r.URL.Query().Get("new_key"),
+	}
+	h.render(w, "adminAPIKeys", data)
+}
+
+// AdminCreateAPIKey handles POST to create an API key.
+func (h *UIHandlers) AdminCreateAPIKey(w http.ResponseWriter, r *http.Request) {
+	tenantSlug := chi.URLParam(r, "slug")
+	label := strings.TrimSpace(r.FormValue("label"))
+
+	if label == "" {
+		http.Redirect(w, r, "/ui/admin/tenants/"+tenantSlug+"/keys?error=Label+is+required", http.StatusFound)
+		return
+	}
+
+	// Generate raw key
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		http.Redirect(w, r, "/ui/admin/tenants/"+tenantSlug+"/keys?error=Key+generation+failed", http.StatusFound)
+		return
+	}
+	rawKey := hex.EncodeToString(raw)
+	prefix := rawKey[:8]
+	keyHash := auth.HashKey(rawKey)
+
+	_, err := h.store.CreateAPIKey(r.Context(), tenantSlug, label, keyHash, prefix)
+	if err != nil {
+		slog.Error("admin create api key failed", "error", err)
+		http.Redirect(w, r, "/ui/admin/tenants/"+tenantSlug+"/keys?error="+err.Error(), http.StatusFound)
+		return
+	}
+
+	http.Redirect(w, r, "/ui/admin/tenants/"+tenantSlug+"/keys?success=Key+created&new_key="+rawKey, http.StatusFound)
+}
+
+// AdminRevokeAPIKey handles POST to revoke an API key.
+func (h *UIHandlers) AdminRevokeAPIKey(w http.ResponseWriter, r *http.Request) {
+	tenantSlug := chi.URLParam(r, "slug")
+	prefix := r.FormValue("prefix")
+
+	if err := h.store.RevokeAPIKey(r.Context(), prefix); err != nil {
+		slog.Error("admin revoke api key failed", "error", err)
+		http.Redirect(w, r, "/ui/admin/tenants/"+tenantSlug+"/keys?error="+err.Error(), http.StatusFound)
+		return
+	}
+
+	http.Redirect(w, r, "/ui/admin/tenants/"+tenantSlug+"/keys?success=Key+revoked", http.StatusFound)
+}
+
+// AdminProjects shows all projects with edit capability.
+func (h *UIHandlers) AdminProjects(w http.ResponseWriter, r *http.Request) {
+	projects, err := h.store.ListAllProjects(r.Context())
+	if err != nil {
+		slog.Error("admin projects: list failed", "error", err)
+		h.renderError(w, http.StatusInternalServerError, "Failed to load projects.")
+		return
+	}
+
+	// Build tenant map for display
+	tenants, err := h.store.ListTenants(r.Context())
+	if err != nil {
+		slog.Error("admin projects: list tenants failed", "error", err)
+		tenants = nil
+	}
+	tenantMap := make(map[string]string) // id -> name
+	for _, t := range tenants {
+		tenantMap[t.ID.String()] = t.Name
+	}
+
+	data := map[string]any{
+		"Title":     "Projects",
+		"ShowNav":   true,
+		"NavActive": "admin",
+		"IsAdmin":   true,
+		"Projects":  projects,
+		"TenantMap": tenantMap,
+		"Error":     r.URL.Query().Get("error"),
+		"Success":   r.URL.Query().Get("success"),
+		"EditID":    r.URL.Query().Get("edit"),
+	}
+	h.render(w, "adminProjects", data)
+}
+
+// AdminUpdateProject handles POST to update a project's name/slug.
+func (h *UIHandlers) AdminUpdateProject(w http.ResponseWriter, r *http.Request) {
+	projectID := r.FormValue("project_id")
+	tenantID := r.FormValue("tenant_id")
+	name := strings.TrimSpace(r.FormValue("name"))
+	slug := strings.TrimSpace(r.FormValue("slug"))
+
+	if name == "" && slug == "" {
+		http.Redirect(w, r, "/ui/admin/projects?error=Provide+name+or+slug", http.StatusFound)
+		return
+	}
+
+	// Set tenant context for the update
+	ctx := auth.WithTenant(r.Context(), uuid.MustParse(tenantID))
+
+	var namePtr, slugPtr *string
+	if name != "" {
+		namePtr = &name
+	}
+	if slug != "" {
+		slugPtr = &slug
+	}
+
+	_, err := h.store.UpdateProject(ctx, projectID, namePtr, slugPtr)
+	if err != nil {
+		slog.Error("admin update project failed", "error", err)
+		http.Redirect(w, r, "/ui/admin/projects?error="+err.Error(), http.StatusFound)
+		return
+	}
+
+	http.Redirect(w, r, "/ui/admin/projects?success=Project+updated", http.StatusFound)
 }
 
 var templateFuncs = template.FuncMap{

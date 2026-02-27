@@ -26,5 +26,19 @@ func RegisterUIRoutes(r chi.Router, s store.Store, adminKey string, adminTenantI
 			protected.Get("/issues/{id}", h.IssueDetail)
 			protected.Get("/ready", h.ReadyWork)
 		})
+
+		// Admin routes — require admin session
+		ui.Route("/admin", func(admin chi.Router) {
+			admin.Use(AdminSessionMiddleware(adminKey))
+
+			admin.Get("/", h.AdminDashboard)
+			admin.Get("/tenants", h.AdminTenants)
+			admin.Post("/tenants", h.AdminCreateTenant)
+			admin.Get("/tenants/{slug}/keys", h.AdminAPIKeys)
+			admin.Post("/tenants/{slug}/keys", h.AdminCreateAPIKey)
+			admin.Post("/tenants/{slug}/keys/revoke", h.AdminRevokeAPIKey)
+			admin.Get("/projects", h.AdminProjects)
+			admin.Post("/projects", h.AdminUpdateProject)
+		})
 	})
 }

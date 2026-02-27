@@ -272,6 +272,7 @@ This project uses Doit for persistent work tracking via MCP.
   <tr><td><code>POST /admin/mcp</code></td><td>Admin key</td><td>Admin MCP server (6 tools)</td></tr>
   <tr><td><code>GET /documentation</code></td><td>None</td><td>This page</td></tr>
   <tr><td><code>GET /ui/</code></td><td>Session cookie</td><td>Web UI (login with API key)</td></tr>
+  <tr><td><code>GET /ui/admin/</code></td><td>Admin session</td><td>Admin UI (tenants, API keys, projects)</td></tr>
 </table>
 
 <hr>

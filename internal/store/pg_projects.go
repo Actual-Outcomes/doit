@@ -60,6 +60,29 @@ func (s *PgStore) ListProjects(ctx context.Context) ([]model.Project, error) {
 	return projects, rows.Err()
 }
 
+// ListAllProjects returns all projects across all tenants. Admin use only.
+func (s *PgStore) ListAllProjects(ctx context.Context) ([]model.Project, error) {
+	ctx, cancel := s.withTimeout(ctx)
+	defer cancel()
+
+	rows, err := s.pool.Query(ctx,
+		"SELECT id, tenant_id, name, slug, created_at FROM project ORDER BY name")
+	if err != nil {
+		return nil, fmt.Errorf("listing all projects: %w", err)
+	}
+	defer rows.Close()
+
+	var projects []model.Project
+	for rows.Next() {
+		var p model.Project
+		if err := rows.Scan(&p.ID, &p.TenantID, &p.Name, &p.Slug, &p.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scanning project: %w", err)
+		}
+		projects = append(projects, p)
+	}
+	return projects, rows.Err()
+}
+
 // GetProjectBySlug returns a single project by its slug within the tenant.
 func (s *PgStore) GetProjectBySlug(ctx context.Context, slug string) (*model.Project, error) {
 	ctx, cancel := s.withTimeout(ctx)

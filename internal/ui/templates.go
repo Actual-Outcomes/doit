@@ -267,6 +267,7 @@ const baseLayout = `<!DOCTYPE html>
     <a href="/ui/" {{if eq .NavActive "dashboard"}}class="active"{{end}}>Dashboard</a>
     <a href="/ui/issues" {{if eq .NavActive "issues"}}class="active"{{end}}>Issues</a>
     <a href="/ui/ready" {{if eq .NavActive "ready"}}class="active"{{end}}>Ready</a>
+    {{if .IsAdmin}}<a href="/ui/admin/" {{if eq .NavActive "admin"}}class="active"{{end}} style="color:#f59e0b">Admin</a>{{end}}
   </div>
   {{if .Projects}}
   <div class="nav-project">
@@ -550,4 +551,170 @@ const errorPage = `{{define "page"}}
   <div class="message">{{.Message}}</div>
   <p style="margin-top:1.5rem"><a href="/ui/">Back to Dashboard</a></p>
 </div>
+{{end}}`
+
+// --- Admin templates ---
+
+const adminDashboardPage = `{{define "page"}}
+<h1>Admin</h1>
+<div class="stat-cards">
+  <div class="stat-card">
+    <div class="label">Tenants</div>
+    <div class="value">{{len .Tenants}}</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Projects</div>
+    <div class="value">{{len .Projects}}</div>
+  </div>
+</div>
+<div style="display:flex;gap:1rem;margin-bottom:2rem">
+  <a href="/ui/admin/tenants" style="padding:0.5rem 1rem;background:#2563eb;color:#fff;border-radius:6px;text-decoration:none">Manage Tenants</a>
+  <a href="/ui/admin/projects" style="padding:0.5rem 1rem;background:#2563eb;color:#fff;border-radius:6px;text-decoration:none">Manage Projects</a>
+</div>
+{{end}}`
+
+const adminTenantsPage = `{{define "page"}}
+<h1>Tenants</h1>
+<p style="margin-bottom:1rem"><a href="/ui/admin/">&larr; Admin</a></p>
+
+{{if .Error}}<p style="color:#dc2626;margin-bottom:1rem">{{.Error}}</p>{{end}}
+{{if .Success}}<p style="color:#059669;margin-bottom:1rem">{{.Success}}</p>{{end}}
+
+<div class="detail-body" style="margin-bottom:1.5rem">
+  <h3 style="margin-top:0">Create Tenant</h3>
+  <form method="POST" action="/ui/admin/tenants" style="display:flex;gap:0.75rem;align-items:end;flex-wrap:wrap">
+    <div>
+      <label style="display:block;font-size:0.85rem;color:#64748b;margin-bottom:0.25rem">Name</label>
+      <input type="text" name="name" placeholder="My Org" required style="padding:0.4rem 0.75rem;border:1px solid #cbd5e1;border-radius:6px;font-size:0.9rem">
+    </div>
+    <div>
+      <label style="display:block;font-size:0.85rem;color:#64748b;margin-bottom:0.25rem">Slug</label>
+      <input type="text" name="slug" placeholder="my-org" required pattern="[a-z0-9-]+" style="padding:0.4rem 0.75rem;border:1px solid #cbd5e1;border-radius:6px;font-size:0.9rem">
+    </div>
+    <button type="submit" style="padding:0.4rem 1rem;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.9rem">Create</button>
+  </form>
+</div>
+
+{{if .Tenants}}
+<table>
+  <thead><tr><th>Name</th><th>Slug</th><th>Created</th><th>Actions</th></tr></thead>
+  <tbody>
+  {{range .Tenants}}
+  <tr>
+    <td>{{.Name}}</td>
+    <td><code>{{.Slug}}</code></td>
+    <td style="color:#64748b;font-size:0.85rem">{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
+    <td><a href="/ui/admin/tenants/{{.Slug}}/keys">API Keys</a></td>
+  </tr>
+  {{end}}
+  </tbody>
+</table>
+{{else}}
+<div class="empty">No tenants yet.</div>
+{{end}}
+{{end}}`
+
+const adminAPIKeysPage = `{{define "page"}}
+<h1>API Keys &mdash; {{.TenantSlug}}</h1>
+<p style="margin-bottom:1rem"><a href="/ui/admin/tenants">&larr; Tenants</a></p>
+
+{{if .Error}}<p style="color:#dc2626;margin-bottom:1rem">{{.Error}}</p>{{end}}
+{{if .Success}}<p style="color:#059669;margin-bottom:1rem">{{.Success}}</p>{{end}}
+
+{{if .NewKey}}
+<div style="background:#fefce8;border:2px solid #facc15;border-radius:8px;padding:1rem;margin-bottom:1.5rem">
+  <strong style="color:#854d0e">New API Key (shown once):</strong>
+  <div style="margin-top:0.5rem;padding:0.5rem;background:#fff;border-radius:4px;font-family:monospace;font-size:0.9rem;word-break:break-all;user-select:all">{{.NewKey}}</div>
+  <p style="color:#854d0e;font-size:0.85rem;margin-top:0.5rem">Copy this key now. It cannot be retrieved again.</p>
+</div>
+{{end}}
+
+<div class="detail-body" style="margin-bottom:1.5rem">
+  <h3 style="margin-top:0">Create API Key</h3>
+  <form method="POST" action="/ui/admin/tenants/{{.TenantSlug}}/keys" style="display:flex;gap:0.75rem;align-items:end">
+    <div>
+      <label style="display:block;font-size:0.85rem;color:#64748b;margin-bottom:0.25rem">Label</label>
+      <input type="text" name="label" placeholder="agent-key" required style="padding:0.4rem 0.75rem;border:1px solid #cbd5e1;border-radius:6px;font-size:0.9rem">
+    </div>
+    <button type="submit" style="padding:0.4rem 1rem;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.9rem">Create Key</button>
+  </form>
+</div>
+
+{{if .Keys}}
+<table>
+  <thead><tr><th>Prefix</th><th>Label</th><th>Created</th><th>Status</th><th>Actions</th></tr></thead>
+  <tbody>
+  {{range .Keys}}
+  <tr{{if .RevokedAt}} style="opacity:0.5"{{end}}>
+    <td><code>{{.Prefix}}</code></td>
+    <td>{{.Label}}</td>
+    <td style="color:#64748b;font-size:0.85rem">{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
+    <td>
+      {{if .RevokedAt}}
+        <span class="badge badge-blocked">REVOKED</span>
+      {{else}}
+        <span class="badge badge-open">ACTIVE</span>
+      {{end}}
+    </td>
+    <td>
+      {{if not .RevokedAt}}
+      <form method="POST" action="/ui/admin/tenants/{{$.TenantSlug}}/keys/revoke" style="display:inline" onsubmit="return confirm('Revoke key {{.Prefix}}...?')">
+        <input type="hidden" name="prefix" value="{{.Prefix}}">
+        <button type="submit" style="background:#dc2626;color:#fff;border:none;padding:0.25rem 0.75rem;border-radius:4px;cursor:pointer;font-size:0.8rem">Revoke</button>
+      </form>
+      {{else}}
+      <span style="color:#94a3b8;font-size:0.85rem">&mdash;</span>
+      {{end}}
+    </td>
+  </tr>
+  {{end}}
+  </tbody>
+</table>
+{{else}}
+<div class="empty">No API keys for this tenant.</div>
+{{end}}
+{{end}}`
+
+const adminProjectsPage = `{{define "page"}}
+<h1>Projects</h1>
+<p style="margin-bottom:1rem"><a href="/ui/admin/">&larr; Admin</a></p>
+
+{{if .Error}}<p style="color:#dc2626;margin-bottom:1rem">{{.Error}}</p>{{end}}
+{{if .Success}}<p style="color:#059669;margin-bottom:1rem">{{.Success}}</p>{{end}}
+
+{{if .Projects}}
+<table>
+  <thead><tr><th>Name</th><th>Slug</th><th>Tenant</th><th>Created</th><th>Actions</th></tr></thead>
+  <tbody>
+  {{range .Projects}}
+  {{if eq (printf "%s" .ID) $.EditID}}
+  <tr>
+    <form method="POST" action="/ui/admin/projects">
+      <input type="hidden" name="project_id" value="{{.ID}}">
+      <input type="hidden" name="tenant_id" value="{{.TenantID}}">
+      <td><input type="text" name="name" value="{{.Name}}" style="padding:0.3rem 0.5rem;border:1px solid #cbd5e1;border-radius:4px;font-size:0.9rem;width:100%"></td>
+      <td><input type="text" name="slug" value="{{.Slug}}" pattern="[a-z0-9-]+" style="padding:0.3rem 0.5rem;border:1px solid #cbd5e1;border-radius:4px;font-size:0.9rem;width:100%"></td>
+      <td style="color:#64748b;font-size:0.85rem">{{index $.TenantMap (printf "%s" .TenantID)}}</td>
+      <td style="color:#64748b;font-size:0.85rem">{{.CreatedAt.Format "2006-01-02"}}</td>
+      <td>
+        <button type="submit" style="background:#059669;color:#fff;border:none;padding:0.25rem 0.75rem;border-radius:4px;cursor:pointer;font-size:0.8rem">Save</button>
+        <a href="/ui/admin/projects" style="margin-left:0.5rem;font-size:0.85rem">Cancel</a>
+      </td>
+    </form>
+  </tr>
+  {{else}}
+  <tr>
+    <td>{{.Name}}</td>
+    <td><code>{{.Slug}}</code></td>
+    <td style="color:#64748b;font-size:0.85rem">{{index $.TenantMap (printf "%s" .TenantID)}}</td>
+    <td style="color:#64748b;font-size:0.85rem">{{.CreatedAt.Format "2006-01-02"}}</td>
+    <td><a href="/ui/admin/projects?edit={{.ID}}">Edit</a></td>
+  </tr>
+  {{end}}
+  {{end}}
+  </tbody>
+</table>
+{{else}}
+<div class="empty">No projects yet.</div>
+{{end}}
 {{end}}`
