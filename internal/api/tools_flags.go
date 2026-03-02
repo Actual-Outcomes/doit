@@ -31,7 +31,7 @@ func (h *Handlers) RaiseFlag(ctx context.Context, _ *mcp.CallToolRequest, args r
 	if args.Context != nil {
 		input.Context = *args.Context
 	}
-	if args.Project != nil && *args.Project != "" {
+	if strSet(args.Project) {
 		resolved, err := resolveProjectSlug(ctx, h.store, *args.Project)
 		if err != nil {
 			return errResult(err)
@@ -60,21 +60,21 @@ type listFlagsArgs struct {
 func (h *Handlers) ListFlags(ctx context.Context, _ *mcp.CallToolRequest, args listFlagsArgs) (*mcp.CallToolResult, any, error) {
 	filter := model.FlagFilter{}
 
-	if args.Project != nil && *args.Project != "" {
+	if strSet(args.Project) {
 		resolved, err := resolveProjectSlug(ctx, h.store, *args.Project)
 		if err != nil {
 			return errResult(err)
 		}
 		filter.ProjectID = &resolved
 	}
-	if args.Status != nil && *args.Status != "" {
+	if strSet(args.Status) {
 		s := model.FlagStatus(*args.Status)
 		filter.Status = &s
 	}
 	if args.Severity != nil {
 		filter.Severity = args.Severity
 	}
-	if args.IssueID != nil && *args.IssueID != "" {
+	if strSet(args.IssueID) {
 		filter.IssueID = args.IssueID
 	}
 	if args.Limit != nil {

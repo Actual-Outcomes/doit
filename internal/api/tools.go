@@ -39,6 +39,13 @@ func errResult(err error) (*mcp.CallToolResult, any, error) {
 	}, nil, nil
 }
 
+// strSet returns true if the pointer holds a meaningful value —
+// not nil, not empty, and not the literal string "null" that some
+// MCP clients send in place of JSON null.
+func strSet(s *string) bool {
+	return s != nil && *s != "" && *s != "null"
+}
+
 type createIssueArgs struct {
 	Title              string   `json:"title"`
 	Description        string   `json:"description"`
@@ -210,7 +217,7 @@ func (h *Handlers) ListIssues(ctx context.Context, _ *mcp.CallToolRequest, args 
 	if args.Assignee != "" {
 		filter.Assignee = &args.Assignee
 	}
-	if args.Project != nil && *args.Project != "" {
+	if strSet(args.Project) {
 		resolved, err := resolveProjectSlug(ctx, h.store, *args.Project)
 		if err != nil {
 			return errResult(err)
@@ -258,7 +265,7 @@ func (h *Handlers) Ready(ctx context.Context, _ *mcp.CallToolRequest, args ready
 		limit = 20
 	}
 	filter := model.IssueFilter{Limit: limit}
-	if args.Project != nil && *args.Project != "" {
+	if strSet(args.Project) {
 		resolved, err := resolveProjectSlug(ctx, h.store, *args.Project)
 		if err != nil {
 			return errResult(err)

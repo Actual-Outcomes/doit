@@ -29,23 +29,23 @@ func (h *Handlers) RecordLesson(ctx context.Context, _ *mcp.CallToolRequest, arg
 		Components: args.Components,
 	}
 
-	if args.Project != nil && *args.Project != "" {
+	if strSet(args.Project) {
 		resolved, err := resolveProjectSlug(ctx, h.store, *args.Project)
 		if err != nil {
 			return errResult(err)
 		}
 		input.ProjectID = resolved
 	}
-	if args.IssueID != nil {
+	if strSet(args.IssueID) {
 		input.IssueID = *args.IssueID
 	}
-	if args.Expert != nil {
+	if strSet(args.Expert) {
 		input.Expert = *args.Expert
 	}
 	if args.Severity != nil {
 		input.Severity = *args.Severity
 	}
-	if args.CreatedBy != nil {
+	if strSet(args.CreatedBy) {
 		input.CreatedBy = *args.CreatedBy
 	}
 
@@ -68,21 +68,21 @@ type listLessonsArgs struct {
 func (h *Handlers) ListLessons(ctx context.Context, _ *mcp.CallToolRequest, args listLessonsArgs) (*mcp.CallToolResult, any, error) {
 	filter := model.LessonFilter{}
 
-	if args.Project != nil && *args.Project != "" {
+	if strSet(args.Project) {
 		resolved, err := resolveProjectSlug(ctx, h.store, *args.Project)
 		if err != nil {
 			return errResult(err)
 		}
 		filter.ProjectID = &resolved
 	}
-	if args.Status != nil && *args.Status != "" {
+	if strSet(args.Status) {
 		s := model.LessonStatus(*args.Status)
 		filter.Status = &s
 	}
-	if args.Expert != nil && *args.Expert != "" {
+	if strSet(args.Expert) {
 		filter.Expert = args.Expert
 	}
-	if args.Component != nil && *args.Component != "" {
+	if strSet(args.Component) {
 		filter.Component = args.Component
 	}
 	if args.Severity != nil {
