@@ -216,6 +216,18 @@ func (m *mockStore) GenerateFlagID(_ context.Context) (string, error) {
 	return "flg-test1", nil
 }
 
+func (m *mockStore) RecordRetry(_ context.Context, input store.RecordRetryInput) (*model.Retry, error) {
+	return &model.Retry{ID: "rty-test1", IssueID: input.IssueID, Attempt: 1, Status: model.RetryStatus(input.Status)}, nil
+}
+
+func (m *mockStore) ListRetries(_ context.Context, _ string, _ model.RetryFilter) ([]model.Retry, error) {
+	return nil, nil
+}
+
+func (m *mockStore) GenerateRetryID(_ context.Context) (string, error) {
+	return "rty-test1", nil
+}
+
 func (m *mockStore) CreateProject(_ context.Context, name, slug string) (*model.Project, error) {
 	p := &model.Project{ID: uuid.New(), Name: name, Slug: slug}
 	m.project = p
@@ -857,6 +869,83 @@ func TestListProjects_HappyPath(t *testing.T) {
 	}
 	if result.IsError {
 		t.Fatal("expected success")
+	}
+}
+
+// --- Retry tests ---
+
+func TestRecordRetry_HappyPath(t *testing.T) {
+	ms := newMockStore()
+	h := NewHandlers(ms)
+
+	result, _, err := h.RecordRetry(context.Background(), nil, recordRetryArgs{
+		IssueID: "doit-test",
+		Status:  "failed",
+		Error:   "timeout after 30s",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatal("expected success")
+	}
+
+	text := result.Content[0].(*mcp.TextContent).Text
+	if !contains(text, "rty-test1") {
+		t.Errorf("response should contain retry ID, got: %s", text)
+	}
+}
+
+func TestRecordRetry_NullOptionalFields(t *testing.T) {
+	ms := newMockStore()
+	h := NewHandlers(ms)
+
+	nullStr := "null"
+	result, _, err := h.RecordRetry(context.Background(), nil, recordRetryArgs{
+		IssueID:   "doit-test",
+		Status:    "failed",
+		Error:     "connection refused",
+		Project:   &nullStr,
+		Agent:     &nullStr,
+		CreatedBy: &nullStr,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("expected success, got error: %s", result.Content[0].(*mcp.TextContent).Text)
+	}
+}
+
+func TestListRetries_HappyPath(t *testing.T) {
+	ms := newMockStore()
+	h := NewHandlers(ms)
+
+	result, _, err := h.ListRetries(context.Background(), nil, listRetriesArgs{
+		IssueID: "doit-test",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatal("expected success")
+	}
+}
+
+func TestListRetries_NullFilters(t *testing.T) {
+	ms := newMockStore()
+	h := NewHandlers(ms)
+
+	nullStr := "null"
+	result, _, err := h.ListRetries(context.Background(), nil, listRetriesArgs{
+		IssueID: "doit-test",
+		Status:  &nullStr,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("expected success, got error: %s", result.Content[0].(*mcp.TextContent).Text)
 	}
 }
 

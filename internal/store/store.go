@@ -64,6 +64,11 @@ type Store interface {
 	ResolveFlag(ctx context.Context, id string, resolution, resolvedBy string) (*model.Flag, error)
 	GenerateFlagID(ctx context.Context) (string, error)
 
+	// Retries
+	RecordRetry(ctx context.Context, input RecordRetryInput) (*model.Retry, error)
+	ListRetries(ctx context.Context, issueID string, filter model.RetryFilter) ([]model.Retry, error)
+	GenerateRetryID(ctx context.Context) (string, error)
+
 	// Projects
 	CreateProject(ctx context.Context, name, slug string) (*model.Project, error)
 	GetProjectBySlug(ctx context.Context, slug string) (*model.Project, error)
@@ -161,6 +166,16 @@ type RaiseFlagInput struct {
 	Severity  int
 	Summary   string
 	Context   json.RawMessage
+	CreatedBy string
+}
+
+// RecordRetryInput holds the fields for recording a retry attempt.
+type RecordRetryInput struct {
+	IssueID   string
+	ProjectID string
+	Status    string
+	Error     string
+	Agent     string
 	CreatedBy string
 }
 

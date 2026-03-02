@@ -2,7 +2,7 @@ package api
 
 import "github.com/modelcontextprotocol/go-sdk/mcp"
 
-// RegisterAgentTools registers agent-facing MCP tools (23 tools).
+// RegisterAgentTools registers agent-facing MCP tools (25 tools).
 func RegisterAgentTools(server *mcp.Server, h *Handlers) {
 	// --- Issue CRUD ---
 
@@ -136,6 +136,22 @@ func RegisterAgentTools(server *mcp.Server, h *Handlers) {
 		Name: "doit_resolve_lesson",
 		Description: "Mark a lesson as resolved after the correction has been applied.",
 	}, h.ResolveLesson)
+
+	// --- Retries ---
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "doit_record_retry",
+		Description: "Record a retry attempt for an issue. Attempt number is auto-computed. " +
+			"Status: failed, succeeded, abandoned, escalated. " +
+			"Use to track retry history for informed retry/escalate/abandon decisions.",
+	}, h.RecordRetry)
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "doit_list_retries",
+		Description: "List retry attempts for an issue, ordered by attempt number. " +
+			"Shows attempt count, status, error, and agent for each attempt. " +
+			"Use to check retry history before deciding to retry, escalate, or abandon.",
+	}, h.ListRetries)
 
 	// --- Flags (Human Escalation) ---
 

@@ -125,7 +125,7 @@ This project uses Doit for persistent work tracking via MCP.
 - Call doit_create_issue with project slug for new work items
 - Call doit_add_dependency to track blockers</code></pre>
 
-<h2>Agent Tools (23)</h2>
+<h2>Agent Tools (25)</h2>
 <p>Available on <code>POST /mcp</code> — authenticated with any API key (tenant or admin).</p>
 
 <h3>Issue CRUD</h3>
@@ -186,6 +186,15 @@ This project uses Doit for persistent work tracking via MCP.
   <tr><td><code>doit_record_lesson</code></td><td>Record a lesson learned — a mistake and its correction. Required: <code>title</code>, <code>mistake</code>, <code>correction</code>. Optional: <code>project</code> (slug), <code>issue_id</code>, <code>expert</code>, <code>components</code>, <code>severity</code>, <code>created_by</code>.</td></tr>
   <tr><td><code>doit_list_lessons</code></td><td>List lessons learned. All filters optional: <code>project</code> (slug), <code>status</code>, <code>expert</code>, <code>component</code>, <code>severity</code>, <code>limit</code>.</td></tr>
   <tr><td><code>doit_resolve_lesson</code></td><td>Mark a lesson as resolved. Required: <code>id</code>. Optional: <code>resolved_by</code>.</td></tr>
+</table>
+
+<h3>Retries (Operational Memory)</h3>
+<p>Structured retry tracking for informed retry/escalate/abandon decisions. Attempt numbers are auto-computed per issue.
+Retry history persists across sessions so agents can check how many times a task has been attempted.</p>
+<table>
+  <tr><th>Tool</th><th>Description</th></tr>
+  <tr><td><code>doit_record_retry</code></td><td>Record a retry attempt. Required: <code>issue_id</code>, <code>status</code> (failed/succeeded/abandoned/escalated), <code>error</code>. Optional: <code>project</code> (slug), <code>agent</code>, <code>created_by</code>. Attempt number auto-increments.</td></tr>
+  <tr><td><code>doit_list_retries</code></td><td>List retry attempts for an issue, ordered by attempt number. Optional: <code>status</code>, <code>limit</code>.</td></tr>
 </table>
 
 <h3>Flags (Human Escalation)</h3>
@@ -269,6 +278,9 @@ Flags survive session reset and are queryable across agent sessions.</p>
 
 <h3>Flag Severity</h3>
 <p><strong>1</strong> = critical &middot; <strong>2</strong> = blocking &middot; <strong>3</strong> = warning. Severity 1&ndash;2 flags on an issue exclude it from <code>doit_ready()</code>.</p>
+
+<h3>Retry Statuses</h3>
+<p><code>failed</code> &middot; <code>succeeded</code> &middot; <code>abandoned</code> &middot; <code>escalated</code></p>
 
 <h3>Dependency Types (19)</h3>
 <p><code>blocks</code> &middot; <code>conditional-blocks</code> &middot; <code>waits-for</code> &middot; <code>parent-child</code> &middot; <code>related</code> &middot; <code>relates-to</code> &middot; <code>discovered-from</code> &middot; <code>caused-by</code> &middot; <code>replies-to</code> &middot; <code>duplicates</code> &middot; <code>supersedes</code> &middot; <code>authored-by</code> &middot; <code>assigned-to</code> &middot; <code>approved-by</code> &middot; <code>attests</code> &middot; <code>validates</code> &middot; <code>tracks</code> &middot; <code>until</code> &middot; <code>delegated-from</code></p>
