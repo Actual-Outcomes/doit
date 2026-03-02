@@ -583,6 +583,310 @@ func TestUpdateIssue_Claim(t *testing.T) {
 	}
 }
 
+// --- Null string handling tests ---
+// These verify that literal "null" strings (sent by MCP clients for JSON null)
+// are treated as unset and don't cause FK violations or incorrect filters.
+
+func TestUpdateIssue_NullStrings(t *testing.T) {
+	ms := newMockStore()
+	h := NewHandlers(ms)
+	ms.issues["x"] = &model.Issue{ID: "x", Title: "Original", Status: model.StatusOpen, Assignee: "dave"}
+
+	// All optional string fields set to "null" — should be treated as no-op
+	nullStr := "null"
+	result, _, err := h.UpdateIssue(context.Background(), nil, updateIssueArgs{
+		ID:          "x",
+		Title:       &nullStr,
+		Description: &nullStr,
+		Status:      &nullStr,
+		Assignee:    &nullStr,
+		Owner:       &nullStr,
+		Notes:       &nullStr,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("expected success, got error: %s", result.Content[0].(*mcp.TextContent).Text)
+	}
+
+	// Title should remain unchanged because filterNull converts "null" to nil
+	issue := ms.issues["x"]
+	if issue.Title != "Original" {
+		t.Errorf("title = %q, want %q (null should be no-op)", issue.Title, "Original")
+	}
+}
+
+func TestListIssues_NullProject(t *testing.T) {
+	ms := newMockStore()
+	h := NewHandlers(ms)
+	ms.issues["a"] = &model.Issue{ID: "a", Title: "Task A", Status: model.StatusOpen}
+
+	// Project set to "null" — should be treated as unset, not trigger slug resolution
+	nullStr := "null"
+	result, _, err := h.ListIssues(context.Background(), nil, listIssuesArgs{
+		Project: &nullStr,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("expected success, got error: %s", result.Content[0].(*mcp.TextContent).Text)
+	}
+}
+
+func TestReady_NullProject(t *testing.T) {
+	ms := newMockStore()
+	h := NewHandlers(ms)
+	ms.issues["a"] = &model.Issue{ID: "a", Title: "Ready", Status: model.StatusOpen}
+
+	nullStr := "null"
+	result, _, err := h.Ready(context.Background(), nil, readyArgs{
+		Project: &nullStr,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("expected success, got error: %s", result.Content[0].(*mcp.TextContent).Text)
+	}
+}
+
+func TestRecordLesson_NullOptionalFields(t *testing.T) {
+	ms := newMockStore()
+	h := NewHandlers(ms)
+
+	// All optional fields set to "null" — should not be passed to store
+	nullStr := "null"
+	result, _, err := h.RecordLesson(context.Background(), nil, recordLessonArgs{
+		Title:      "Test lesson",
+		Mistake:    "Did something wrong",
+		Correction: "Do it right",
+		Project:    &nullStr,
+		IssueID:    &nullStr,
+		Expert:     &nullStr,
+		CreatedBy:  &nullStr,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("expected success, got error: %s", result.Content[0].(*mcp.TextContent).Text)
+	}
+}
+
+func TestRecordLesson_HappyPath(t *testing.T) {
+	ms := newMockStore()
+	h := NewHandlers(ms)
+
+	result, _, err := h.RecordLesson(context.Background(), nil, recordLessonArgs{
+		Title:      "Lesson title",
+		Mistake:    "The mistake",
+		Correction: "The correction",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatal("expected success")
+	}
+}
+
+func TestListLessons_NullFilters(t *testing.T) {
+	ms := newMockStore()
+	h := NewHandlers(ms)
+
+	// All filters set to "null" — should return unfiltered results
+	nullStr := "null"
+	result, _, err := h.ListLessons(context.Background(), nil, listLessonsArgs{
+		Project:   &nullStr,
+		Status:    &nullStr,
+		Expert:    &nullStr,
+		Component: &nullStr,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("expected success, got error: %s", result.Content[0].(*mcp.TextContent).Text)
+	}
+}
+
+func TestListLessons_HappyPath(t *testing.T) {
+	ms := newMockStore()
+	h := NewHandlers(ms)
+
+	result, _, err := h.ListLessons(context.Background(), nil, listLessonsArgs{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatal("expected success")
+	}
+}
+
+func TestResolveLesson_HappyPath(t *testing.T) {
+	ms := newMockStore()
+	h := NewHandlers(ms)
+
+	result, _, err := h.ResolveLesson(context.Background(), nil, resolveLessonArgs{
+		ID: "lsn-test",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatal("expected success")
+	}
+}
+
+func TestRaiseFlag_NullOptionalFields(t *testing.T) {
+	ms := newMockStore()
+	h := NewHandlers(ms)
+
+	nullStr := "null"
+	result, _, err := h.RaiseFlag(context.Background(), nil, raiseFlagArgs{
+		IssueID:   "doit-test",
+		Type:      "structural_concern",
+		Severity:  2,
+		Summary:   "Test flag",
+		Project:   &nullStr,
+		CreatedBy: &nullStr,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("expected success, got error: %s", result.Content[0].(*mcp.TextContent).Text)
+	}
+}
+
+func TestRaiseFlag_HappyPath(t *testing.T) {
+	ms := newMockStore()
+	h := NewHandlers(ms)
+
+	result, _, err := h.RaiseFlag(context.Background(), nil, raiseFlagArgs{
+		IssueID:  "doit-test",
+		Type:     "red_flag",
+		Severity: 1,
+		Summary:  "Critical concern",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatal("expected success")
+	}
+}
+
+func TestListFlags_NullFilters(t *testing.T) {
+	ms := newMockStore()
+	h := NewHandlers(ms)
+
+	nullStr := "null"
+	result, _, err := h.ListFlags(context.Background(), nil, listFlagsArgs{
+		Project: &nullStr,
+		Status:  &nullStr,
+		IssueID: &nullStr,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("expected success, got error: %s", result.Content[0].(*mcp.TextContent).Text)
+	}
+}
+
+func TestListFlags_HappyPath(t *testing.T) {
+	ms := newMockStore()
+	h := NewHandlers(ms)
+
+	result, _, err := h.ListFlags(context.Background(), nil, listFlagsArgs{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatal("expected success")
+	}
+}
+
+func TestResolveFlag_HappyPath(t *testing.T) {
+	ms := newMockStore()
+	h := NewHandlers(ms)
+
+	result, _, err := h.ResolveFlag(context.Background(), nil, resolveFlagArgs{
+		ID:         "flg-test",
+		Resolution: "Fixed the concern",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatal("expected success")
+	}
+}
+
+func TestCreateProject_HappyPath(t *testing.T) {
+	ms := newMockStore()
+	h := NewHandlers(ms)
+
+	result, _, err := h.CreateProject(context.Background(), nil, createProjectArgs{
+		Name: "Test Project",
+		Slug: "test-project",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatal("expected success")
+	}
+
+	text := result.Content[0].(*mcp.TextContent).Text
+	if !contains(text, "test-project") {
+		t.Errorf("response should contain slug, got: %s", text)
+	}
+}
+
+func TestListProjects_HappyPath(t *testing.T) {
+	ms := newMockStore()
+	h := NewHandlers(ms)
+
+	result, _, err := h.ListProjects(context.Background(), nil, listProjectsArgs{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatal("expected success")
+	}
+}
+
+// --- strSet unit tests ---
+
+func TestStrSet(t *testing.T) {
+	tests := []struct {
+		name string
+		val  *string
+		want bool
+	}{
+		{"nil", nil, false},
+		{"empty", strPtr(""), false},
+		{"null string", strPtr("null"), false},
+		{"real value", strPtr("doit"), true},
+		{"whitespace", strPtr(" "), true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := strSet(tt.val)
+			if got != tt.want {
+				t.Errorf("strSet(%v) = %v, want %v", tt.val, got, tt.want)
+			}
+		})
+	}
+}
+
+func strPtr(s string) *string { return &s }
+
 // helper
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsStr(s, substr))
