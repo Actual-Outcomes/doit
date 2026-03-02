@@ -13,12 +13,12 @@ type recordLessonArgs struct {
 	Title      string   `json:"title"`
 	Mistake    string   `json:"mistake"`
 	Correction string   `json:"correction"`
-	Project    *string  `json:"project"`
-	IssueID    *string  `json:"issue_id"`
-	Expert     *string  `json:"expert"`
-	Components []string `json:"components"`
-	Severity   *int     `json:"severity"`
-	CreatedBy  *string  `json:"created_by"`
+	Project    *string  `json:"project,omitempty"`
+	IssueID    *string  `json:"issue_id,omitempty"`
+	Expert     *string  `json:"expert,omitempty"`
+	Components []string `json:"components,omitempty"`
+	Severity   *int     `json:"severity,omitempty"`
+	CreatedBy  *string  `json:"created_by,omitempty"`
 }
 
 func (h *Handlers) RecordLesson(ctx context.Context, _ *mcp.CallToolRequest, args recordLessonArgs) (*mcp.CallToolResult, any, error) {
@@ -57,12 +57,12 @@ func (h *Handlers) RecordLesson(ctx context.Context, _ *mcp.CallToolRequest, arg
 }
 
 type listLessonsArgs struct {
-	Project   *string `json:"project"`
-	Status    *string `json:"status"`
-	Expert    *string `json:"expert"`
-	Component *string `json:"component"`
-	Severity  *int    `json:"severity"`
-	Limit     *int    `json:"limit"`
+	Project   *string `json:"project,omitempty"`
+	Status    *string `json:"status,omitempty"`
+	Expert    *string `json:"expert,omitempty"`
+	Component *string `json:"component,omitempty"`
+	Severity  *int    `json:"severity,omitempty"`
+	Limit     *int    `json:"limit,omitempty"`
 }
 
 func (h *Handlers) ListLessons(ctx context.Context, _ *mcp.CallToolRequest, args listLessonsArgs) (*mcp.CallToolResult, any, error) {
@@ -101,7 +101,7 @@ func (h *Handlers) ListLessons(ctx context.Context, _ *mcp.CallToolRequest, args
 
 type resolveLessonArgs struct {
 	ID         string  `json:"id"`
-	ResolvedBy *string `json:"resolved_by"`
+	ResolvedBy *string `json:"resolved_by,omitempty"`
 }
 
 func (h *Handlers) ResolveLesson(ctx context.Context, _ *mcp.CallToolRequest, args resolveLessonArgs) (*mcp.CallToolResult, any, error) {

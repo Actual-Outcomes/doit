@@ -183,19 +183,21 @@ This project uses Doit for persistent work tracking via MCP.
 <h3>Lessons Learned</h3>
 <table>
   <tr><th>Tool</th><th>Description</th></tr>
-  <tr><td><code>doit_record_lesson</code></td><td>Record a lesson learned — a mistake and its correction. Tag with components and expert role for filtering. Use <code>project</code> (slug) to scope.</td></tr>
-  <tr><td><code>doit_list_lessons</code></td><td>List lessons learned, filtered by project, status, expert, component, or severity. Review before starting work to avoid repeating mistakes.</td></tr>
-  <tr><td><code>doit_resolve_lesson</code></td><td>Mark a lesson as resolved after the correction has been applied.</td></tr>
+  <tr><td><code>doit_record_lesson</code></td><td>Record a lesson learned — a mistake and its correction. Required: <code>title</code>, <code>mistake</code>, <code>correction</code>. Optional: <code>project</code> (slug), <code>issue_id</code>, <code>expert</code>, <code>components</code>, <code>severity</code>, <code>created_by</code>.</td></tr>
+  <tr><td><code>doit_list_lessons</code></td><td>List lessons learned. All filters optional: <code>project</code> (slug), <code>status</code>, <code>expert</code>, <code>component</code>, <code>severity</code>, <code>limit</code>.</td></tr>
+  <tr><td><code>doit_resolve_lesson</code></td><td>Mark a lesson as resolved. Required: <code>id</code>. Optional: <code>resolved_by</code>.</td></tr>
 </table>
 
-<h2>Admin Tools (6)</h2>
+<h2>Admin Tools (10)</h2>
 <p>Available on <code>POST /admin/mcp</code> — requires admin API key. Tenant keys receive 403.</p>
 
 <h3>Tenant Management</h3>
 <table>
   <tr><th>Tool</th><th>Description</th></tr>
   <tr><td><code>doit_create_tenant</code></td><td>Create a new tenant. Each tenant gets isolated data.</td></tr>
+  <tr><td><code>doit_update_tenant</code></td><td>Update a tenant's name or slug. Accepts tenant slug as identifier. Provide <code>name</code> and/or <code>slug</code> to change.</td></tr>
   <tr><td><code>doit_list_tenants</code></td><td>List all tenants.</td></tr>
+  <tr><td><code>doit_delete_tenant</code></td><td>Delete a tenant and its API keys. Rejects if projects still exist (delete them first). Accepts tenant slug.</td></tr>
   <tr><td><code>doit_create_api_key</code></td><td>Generate a new API key for a tenant. The raw key is returned once and cannot be retrieved again.</td></tr>
   <tr><td><code>doit_revoke_api_key</code></td><td>Revoke an API key by its 8-character prefix.</td></tr>
   <tr><td><code>doit_list_api_keys</code></td><td>List all API keys for a tenant.</td></tr>
@@ -205,6 +207,13 @@ This project uses Doit for persistent work tracking via MCP.
 <table>
   <tr><th>Tool</th><th>Description</th></tr>
   <tr><td><code>doit_update_project</code></td><td>Update a project's name or slug. Accepts project ID or current slug as <code>project</code> identifier. Provide <code>name</code> and/or <code>slug</code> to change.</td></tr>
+  <tr><td><code>doit_delete_project</code></td><td>Delete a project. Rejects if issues still reference the project. Accepts project slug.</td></tr>
+</table>
+
+<h3>Admin Key Management</h3>
+<table>
+  <tr><th>Tool</th><th>Description</th></tr>
+  <tr><td><code>doit_rotate_admin_key</code></td><td>Generate a new admin API key and store its hash in the database. The raw key is returned once. The env var key (<code>API_KEY</code>) still works as fallback.</td></tr>
 </table>
 
 <h2>Data Model</h2>
@@ -245,6 +254,9 @@ This project uses Doit for persistent work tracking via MCP.
 <p>Doit uses <strong>hash-based IDs</strong> with a configurable prefix (default: <code>doit</code>). IDs are generated from a SHA-256 hash of a random seed, using the shortest unique prefix (minimum 7 chars).</p>
 <p>Hierarchical children use dotted notation: <code>doit-abc1234.1</code>, <code>doit-abc1234.2</code>, etc.</p>
 
+<h3>Tenant Isolation</h3>
+<p>Every issue is scoped to the tenant of the authenticated API key. The <code>tenant_id</code> is automatically set on creation and enforced on all reads, updates, and deletes. Tenants cannot see or modify each other's issues.</p>
+
 <h3>Priority</h3>
 <p>Integer 0&ndash;4 where 0 is critical and 4 is backlog. Default: 2 (medium).</p>
 
@@ -269,7 +281,7 @@ This project uses Doit for persistent work tracking via MCP.
   <tr><th>Endpoint</th><th>Auth</th><th>Description</th></tr>
   <tr><td><code>GET /health</code></td><td>None</td><td>Health check</td></tr>
   <tr><td><code>POST /mcp</code></td><td>Bearer token</td><td>Agent MCP server (20 tools)</td></tr>
-  <tr><td><code>POST /admin/mcp</code></td><td>Admin key</td><td>Admin MCP server (6 tools)</td></tr>
+  <tr><td><code>POST /admin/mcp</code></td><td>Admin key</td><td>Admin MCP server (10 tools)</td></tr>
   <tr><td><code>GET /documentation</code></td><td>None</td><td>This page</td></tr>
   <tr><td><code>GET /ui/</code></td><td>Session cookie</td><td>Web UI (login with API key)</td></tr>
   <tr><td><code>GET /ui/admin/</code></td><td>Admin session</td><td>Admin UI (tenants, API keys, projects)</td></tr>
