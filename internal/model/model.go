@@ -208,7 +208,8 @@ type Issue struct {
 	HookBead     string     `json:"hook_bead,omitempty" db:"hook_bead"`
 	RoleBead     string     `json:"role_bead,omitempty" db:"role_bead"`
 
-	// Project
+	// Project / Tenant
+	TenantID  string `json:"tenant_id,omitempty" db:"tenant_id"`
 	ProjectID string `json:"project_id,omitempty" db:"project_id"`
 
 	// Denormalized fields (populated by queries, not stored directly)
@@ -309,6 +310,53 @@ type CompactionSnapshot struct {
 	Summary   string    `json:"summary" db:"summary"`
 	Original  string    `json:"original" db:"original"`
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
+}
+
+// FlagType categorizes escalation flags.
+type FlagType string
+
+const (
+	FlagStructuralConcern FlagType = "structural_concern"
+	FlagFeatureConcern    FlagType = "feature_concern"
+	FlagRedFlag           FlagType = "red_flag"
+	FlagHumanDecision     FlagType = "human_decision"
+	FlagSecurityConcern   FlagType = "security_concern"
+)
+
+// FlagStatus represents the lifecycle state of a flag.
+type FlagStatus string
+
+const (
+	FlagStatusOpen         FlagStatus = "open"
+	FlagStatusAcknowledged FlagStatus = "acknowledged"
+	FlagStatusResolved     FlagStatus = "resolved"
+)
+
+// Flag represents a human escalation tied to a work item.
+type Flag struct {
+	ID         string          `json:"id"`
+	TenantID   string          `json:"tenant_id,omitempty"`
+	ProjectID  string          `json:"project_id,omitempty"`
+	IssueID    string          `json:"issue_id,omitempty"`
+	Type       FlagType        `json:"type"`
+	Severity   int             `json:"severity"`
+	Summary    string          `json:"summary"`
+	Context    json.RawMessage `json:"context"`
+	Status     FlagStatus      `json:"status"`
+	Resolution string          `json:"resolution,omitempty"`
+	ResolvedBy string          `json:"resolved_by,omitempty"`
+	ResolvedAt *time.Time      `json:"resolved_at,omitempty"`
+	CreatedAt  time.Time       `json:"created_at"`
+	CreatedBy  string          `json:"created_by,omitempty"`
+}
+
+// FlagFilter provides filtering for flag queries.
+type FlagFilter struct {
+	ProjectID *string     `json:"project_id,omitempty"`
+	Status    *FlagStatus `json:"status,omitempty"`
+	Severity  *int        `json:"severity,omitempty"`
+	IssueID   *string     `json:"issue_id,omitempty"`
+	Limit     int         `json:"limit,omitempty"`
 }
 
 // IssueFilter provides comprehensive filtering for issue queries.

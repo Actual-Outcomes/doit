@@ -2,7 +2,7 @@ package api
 
 import "github.com/modelcontextprotocol/go-sdk/mcp"
 
-// RegisterAgentTools registers agent-facing MCP tools (20 tools).
+// RegisterAgentTools registers agent-facing MCP tools (23 tools).
 func RegisterAgentTools(server *mcp.Server, h *Handlers) {
 	// --- Issue CRUD ---
 
@@ -137,15 +137,43 @@ func RegisterAgentTools(server *mcp.Server, h *Handlers) {
 		Description: "Mark a lesson as resolved after the correction has been applied.",
 	}, h.ResolveLesson)
 
+	// --- Flags (Human Escalation) ---
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "doit_raise_flag",
+		Description: "Raise a flag to escalate an issue for human decision. " +
+			"Types: structural_concern, feature_concern, red_flag, human_decision, security_concern. " +
+			"Severity: 1=critical, 2=blocking, 3=warning. " +
+			"Issues with open severity 1-2 flags are excluded from doit_ready() output.",
+	}, h.RaiseFlag)
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "doit_list_flags",
+		Description: "List escalation flags. Filter by project, status (open/acknowledged/resolved), " +
+			"severity, or issue_id. Call at session start to check for unresolved escalations.",
+	}, h.ListFlags)
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "doit_resolve_flag",
+		Description: "Resolve an escalation flag with a resolution message. " +
+			"Records who resolved it and when.",
+	}, h.ResolveFlag)
+
 }
 
-// RegisterAdminTools registers admin-only MCP tools (6 tools).
+// RegisterAdminTools registers admin-only MCP tools (10 tools).
 func RegisterAdminTools(server *mcp.Server, h *Handlers) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "doit_create_tenant",
 		Description: "Create a new tenant. Requires admin API key. " +
 			"Each tenant gets isolated data.",
 	}, h.CreateTenant)
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "doit_update_tenant",
+		Description: "Update a tenant's name or slug. Requires admin API key. " +
+			"Accepts tenant slug as identifier. Provide name and/or slug to change.",
+	}, h.UpdateTenant)
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "doit_list_tenants",
@@ -173,4 +201,22 @@ func RegisterAdminTools(server *mcp.Server, h *Handlers) {
 		Description: "Update a project's name or slug. Requires admin API key. " +
 			"Accepts project ID or slug as identifier.",
 	}, h.AdminUpdateProject)
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "doit_delete_project",
+		Description: "Delete a project. Requires admin API key. " +
+			"Rejects if issues still reference the project. Accepts project slug.",
+	}, h.AdminDeleteProject)
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "doit_delete_tenant",
+		Description: "Delete a tenant and its API keys. Requires admin API key. " +
+			"Rejects if projects still exist (delete them first). Accepts tenant slug.",
+	}, h.DeleteTenant)
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "doit_rotate_admin_key",
+		Description: "Generate a new admin API key and store its hash in the database. " +
+			"The raw key is returned once. The env var key still works as fallback.",
+	}, h.RotateAdminKey)
 }

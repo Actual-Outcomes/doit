@@ -200,6 +200,22 @@ func (m *mockStore) GenerateLessonID(_ context.Context) (string, error) {
 	return "lesson-test1", nil
 }
 
+func (m *mockStore) RaiseFlag(_ context.Context, _ store.RaiseFlagInput) (*model.Flag, error) {
+	return &model.Flag{}, nil
+}
+
+func (m *mockStore) ListFlags(_ context.Context, _ model.FlagFilter) ([]model.Flag, error) {
+	return nil, nil
+}
+
+func (m *mockStore) ResolveFlag(_ context.Context, _ string, _, _ string) (*model.Flag, error) {
+	return &model.Flag{}, nil
+}
+
+func (m *mockStore) GenerateFlagID(_ context.Context) (string, error) {
+	return "flg-test1", nil
+}
+
 func (m *mockStore) CreateProject(_ context.Context, name, slug string) (*model.Project, error) {
 	p := &model.Project{ID: uuid.New(), Name: name, Slug: slug}
 	m.project = p
@@ -222,6 +238,17 @@ func (m *mockStore) ListProjects(_ context.Context) ([]model.Project, error) {
 
 func (m *mockStore) CreateTenant(_ context.Context, name, slug string) (*model.Tenant, error) {
 	return &model.Tenant{ID: uuid.New(), Name: name, Slug: slug}, nil
+}
+
+func (m *mockStore) UpdateTenant(_ context.Context, tenantID string, name, slug *string) (*model.Tenant, error) {
+	t := &model.Tenant{ID: uuid.MustParse(tenantID)}
+	if name != nil {
+		t.Name = *name
+	}
+	if slug != nil {
+		t.Slug = *slug
+	}
+	return t, nil
 }
 
 func (m *mockStore) ListTenants(_ context.Context) ([]model.Tenant, error) { return nil, nil }
@@ -253,6 +280,22 @@ func (m *mockStore) UpdateProject(_ context.Context, projectID string, name, slu
 		p.Slug = *slug
 	}
 	return p, nil
+}
+
+func (m *mockStore) DeleteProject(_ context.Context, _ string) error {
+	return nil
+}
+
+func (m *mockStore) DeleteTenant(_ context.Context, _ string) error {
+	return nil
+}
+
+func (m *mockStore) GetConfig(_ context.Context, key string) (string, error) {
+	return "", fmt.Errorf("config key %q not found", key)
+}
+
+func (m *mockStore) SetConfig(_ context.Context, _, _ string) error {
+	return nil
 }
 
 func (m *mockStore) Close() {}

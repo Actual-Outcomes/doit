@@ -125,7 +125,7 @@ This project uses Doit for persistent work tracking via MCP.
 - Call doit_create_issue with project slug for new work items
 - Call doit_add_dependency to track blockers</code></pre>
 
-<h2>Agent Tools (20)</h2>
+<h2>Agent Tools (23)</h2>
 <p>Available on <code>POST /mcp</code> — authenticated with any API key (tenant or admin).</p>
 
 <h3>Issue CRUD</h3>
@@ -188,6 +188,16 @@ This project uses Doit for persistent work tracking via MCP.
   <tr><td><code>doit_resolve_lesson</code></td><td>Mark a lesson as resolved. Required: <code>id</code>. Optional: <code>resolved_by</code>.</td></tr>
 </table>
 
+<h3>Flags (Human Escalation)</h3>
+<p>Durable escalation flags tied to work items. Issues with open severity 1-2 flags are excluded from <code>doit_ready()</code> output.
+Flags survive session reset and are queryable across agent sessions.</p>
+<table>
+  <tr><th>Tool</th><th>Description</th></tr>
+  <tr><td><code>doit_raise_flag</code></td><td>Raise an escalation flag. Required: <code>issue_id</code>, <code>type</code>, <code>severity</code> (1=critical, 2=blocking, 3=warning), <code>summary</code>. Optional: <code>context</code> (JSON), <code>project</code> (slug), <code>created_by</code>.</td></tr>
+  <tr><td><code>doit_list_flags</code></td><td>List escalation flags. All filters optional: <code>project</code>, <code>status</code> (open/acknowledged/resolved), <code>severity</code>, <code>issue_id</code>, <code>limit</code>.</td></tr>
+  <tr><td><code>doit_resolve_flag</code></td><td>Resolve a flag with a decision. Required: <code>id</code>, <code>resolution</code>. Optional: <code>resolved_by</code>.</td></tr>
+</table>
+
 <h2>Admin Tools (10)</h2>
 <p>Available on <code>POST /admin/mcp</code> — requires admin API key. Tenant keys receive 403.</p>
 
@@ -246,6 +256,19 @@ This project uses Doit for persistent work tracking via MCP.
   <span class="badge badge-open">open</span>
   <span class="badge badge-closed">resolved</span>
 </p>
+
+<h3>Flag Types</h3>
+<p><code>structural_concern</code> &middot; <code>feature_concern</code> &middot; <code>red_flag</code> &middot; <code>human_decision</code> &middot; <code>security_concern</code></p>
+
+<h3>Flag Statuses</h3>
+<p>
+  <span class="badge badge-open">open</span>
+  <span class="badge" style="background:#fef3c7;color:#92400e;">acknowledged</span>
+  <span class="badge badge-closed">resolved</span>
+</p>
+
+<h3>Flag Severity</h3>
+<p><strong>1</strong> = critical &middot; <strong>2</strong> = blocking &middot; <strong>3</strong> = warning. Severity 1&ndash;2 flags on an issue exclude it from <code>doit_ready()</code>.</p>
 
 <h3>Dependency Types (19)</h3>
 <p><code>blocks</code> &middot; <code>conditional-blocks</code> &middot; <code>waits-for</code> &middot; <code>parent-child</code> &middot; <code>related</code> &middot; <code>relates-to</code> &middot; <code>discovered-from</code> &middot; <code>caused-by</code> &middot; <code>replies-to</code> &middot; <code>duplicates</code> &middot; <code>supersedes</code> &middot; <code>authored-by</code> &middot; <code>assigned-to</code> &middot; <code>approved-by</code> &middot; <code>attests</code> &middot; <code>validates</code> &middot; <code>tracks</code> &middot; <code>until</code> &middot; <code>delegated-from</code></p>

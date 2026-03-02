@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/Actual-Outcomes/doit/internal/model"
 	"github.com/google/uuid"
@@ -57,20 +58,33 @@ type Store interface {
 	ResolveLesson(ctx context.Context, id string, resolvedBy string) (*model.Lesson, error)
 	GenerateLessonID(ctx context.Context) (string, error)
 
+	// Flags
+	RaiseFlag(ctx context.Context, input RaiseFlagInput) (*model.Flag, error)
+	ListFlags(ctx context.Context, filter model.FlagFilter) ([]model.Flag, error)
+	ResolveFlag(ctx context.Context, id string, resolution, resolvedBy string) (*model.Flag, error)
+	GenerateFlagID(ctx context.Context) (string, error)
+
 	// Projects
 	CreateProject(ctx context.Context, name, slug string) (*model.Project, error)
 	GetProjectBySlug(ctx context.Context, slug string) (*model.Project, error)
 	ListProjects(ctx context.Context) ([]model.Project, error)
 	ListAllProjects(ctx context.Context) ([]model.Project, error)
 	UpdateProject(ctx context.Context, projectID string, name, slug *string) (*model.Project, error)
+	DeleteProject(ctx context.Context, projectID string) error
 
 	// Tenants
 	CreateTenant(ctx context.Context, name, slug string) (*model.Tenant, error)
+	UpdateTenant(ctx context.Context, tenantID string, name, slug *string) (*model.Tenant, error)
+	DeleteTenant(ctx context.Context, tenantID string) error
 	ListTenants(ctx context.Context) ([]model.Tenant, error)
 	ResolveAPIKey(ctx context.Context, keyHash string) (uuid.UUID, error)
 	CreateAPIKey(ctx context.Context, tenantSlug, label, keyHash, prefix string) (*model.APIKeyInfo, error)
 	RevokeAPIKey(ctx context.Context, prefix string) error
 	ListAPIKeys(ctx context.Context, tenantSlug string) ([]model.APIKeyInfo, error)
+
+	// Config (key-value store)
+	GetConfig(ctx context.Context, key string) (string, error)
+	SetConfig(ctx context.Context, key, value string) error
 
 	Close()
 }
@@ -137,6 +151,17 @@ type RecordLessonInput struct {
 	Components []string
 	Severity   int
 	CreatedBy  string
+}
+
+// RaiseFlagInput holds the fields for raising a flag.
+type RaiseFlagInput struct {
+	IssueID   string
+	ProjectID string
+	Type      string
+	Severity  int
+	Summary   string
+	Context   json.RawMessage
+	CreatedBy string
 }
 
 // AddEventInput holds the fields for creating an audit event.
