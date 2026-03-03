@@ -1,0 +1,77 @@
+# .orchestra/config.yaml — Project-level orchestration configuration
+project:
+  name: "Doit (AI Work Tracker)"
+  key: "doit"
+
+triad:
+  akl:
+    url: "https://ama.aoendpoint.com"
+    agent_endpoint: "/mcp"
+    admin_endpoint: "/admin/mcp"
+  doit:
+    url: "https://din.aoendpoint.com"
+    agent_endpoint: "/mcp"
+    admin_endpoint: "/admin/mcp"
+  herald:
+    url: "https://herald.aoendpoint.com"
+    agent_endpoint: "/mcp"
+    admin_endpoint: "/admin/mcp"
+    agent_key: "doit-orchestrator"
+    agent_name: "Doit Orchestrator"
+
+governance:
+  risk_threshold_for_approval: "MEDIUM"
+  fast_path:
+    max_lines: 10
+    max_components: 1
+    allowed_risk: "LOW"
+  feature_deletion:
+    requires_human_approval: true
+    regardless_of_risk: true
+  lesson_recording:
+    on_gate_failure: true
+    min_severity: 3
+
+phases:
+  phase_0:
+    enabled: true
+    herald_timeout_ms: 5000
+    register_on_start: true
+  phase_7:
+    dod_checks:
+      - behavioral_tests_present
+      - behavioral_tests_passing
+      - test_annotations_complete
+      - traceability_passes
+      - feature_registry_current
+      - no_unauthorized_deprecations
+      - akl_updated
+      - features_md_updated
+      - structural_compliance_passes
+  phase_8:
+    continuous_improvement: true
+    topics:
+      - "architecture-changes"
+      - "deployment-events"
+      - "governance-feedback"
+      - "spec-update"
+
+environments:
+  vnv:
+    url: "https://frm3yffvm9.us-east-1.awsapprunner.com"
+    health_endpoint: "/health"
+    deploy_command: "bash scripts/deploy-vnv.sh"
+  production:
+    url: "https://din.aoendpoint.com"
+    health_endpoint: "/health"
+    deploy_command: "bash scripts/deploy.sh"
+
+agents:
+  architecture: { max_retries: 3 }
+  code_generation: { max_retries: 3, max_lines_per_task: 500 }
+  code_modification: { max_retries: 3, max_lines_per_task: 500 }
+  test: { max_retries: 3 }
+  review: { max_retries: 2 }
+  documentation: { max_retries: 2 }
+  verification: { max_retries: 2, information_isolation: true }
+  devops: { max_retries: 2 }

@@ -38,3 +38,16 @@ variable "api_key" {
   type        = string
   sensitive   = true
 }
+
+# V&V environment
+variable "vnv_database_url" {
+  description = "PostgreSQL connection string for the doit V&V database"
+  type        = string
+  sensitive   = true
+}
+
+variable "vnv_api_key" {
+  description = "Admin API key for doit V&V environment"
+  type        = string
+  sensitive   = true
+}
