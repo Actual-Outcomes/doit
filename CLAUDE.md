@@ -142,6 +142,35 @@ Risk has two dimensions: **product risk** (will users/data be affected?) and **p
 
 **Key distinction:** Additive features following existing codebase patterns (e.g. new table + CRUD handlers like lessons/flags) are LOW product risk even when MEDIUM-HIGH project risk. In agentic orchestration, the build-test-deploy cycle is fast enough that project risk is self-correcting — mistakes are caught in seconds, not days. Reserve human gates for actual product risk.
 
+## Authority Model (v5.6)
+
+All agents operate autonomously within their domain of expertise. The Orchestrator delegates with full trust in each specialist's judgment. Guardrails define safety boundaries that are never crossed; they are not approval gates.
+
+- **Hard gate (requires human approval):** Production deployment only. No code ships to production without explicit human approval showing the version to be deployed.
+- **Red flags (raise and continue):** When the Orchestrator identifies a product risk concern — feature removal, data loss potential, security boundary change, UX degradation, or infrastructure availability impact — it raises a red flag via `doit_raise_flag()` and continues working. The human reviews flags asynchronously and can intervene via Herald STOP or Doit flag resolution.
+- **Escalation (halt and ask):** If the Orchestrator genuinely cannot determine a safe path forward — not "this might be risky" but "I don't know what to do" — it halts and sends a HELP message via Herald.
+
+## Red Flag Escalation Pattern
+
+Product risk is assessed as a set of **red flags** — specific, concrete concerns that require human awareness. Red flags are binary: either a specific concern exists or it doesn't.
+
+| Red Flag | Trigger | Response |
+|----------|---------|----------|
+| **Feature removal** | Plan deprecates, removes, or consolidates user-facing behavior | `doit_raise_flag()`, continue working |
+| **Data loss potential** | Schema migration drops columns/tables, irreversible data transformation | `doit_raise_flag()`, continue working |
+| **Security boundary change** | Modifies auth, secrets management, or permission models | `doit_raise_flag()`, continue working |
+| **Production deployment** | Deploys to production | **Hard gate — human approves** |
+| **UX degradation** | Change could degrade existing user experience | `doit_raise_flag()`, continue working |
+| **Infrastructure availability** | Affects availability, scaling, or disaster recovery | `doit_raise_flag()`, continue working |
+
+**When no red flags are present, work proceeds autonomously.**
+
+**Red flag response protocol:**
+1. Identify the specific red flag(s) and what triggered them.
+2. Raise via `doit_raise_flag()` with type, severity, concern description, proposed mitigation, and blast radius.
+3. **Production deployment flags:** Wait for explicit human approval before deploying.
+4. **All other flags:** Continue working. Human reviews asynchronously. Flags with severity 1-2 exclude the issue from `doit_ready()` until resolved.
+
 ## Fast-Path (ALL must be true)
 - No feature changes, no UI surface changes, LOW product risk
 - Single PBS component, no public interface changes
@@ -149,7 +178,7 @@ Risk has two dimensions: **product risk** (will users/data be affected?) and **p
 ## Non-Negotiable Rules
 1. **Never guess** — if ambiguous, stop and ask the human
 2. **Never relax criteria** — fix the code, not the checks
-3. **Never remove features silently** — all feature-affecting changes require explicit human approval
+3. **Never remove features silently** — never remove, deprecate, or degrade user-facing feature behavior without raising a red flag via `doit_raise_flag()`. Production deployment gate ensures human approval before feature changes reach users.
 4. **Never skip gates** — gates can be extended, never removed
 5. **Never break verification isolation** — Verification Agent must not receive implementation code
 
