@@ -46,6 +46,62 @@ func strSet(s *string) bool {
 	return s != nil && *s != "" && *s != "null"
 }
 
+// Response size protection constants.
+const (
+	maxResponseChars = 50_000
+	defaultLimit     = 50
+	hardCapNoProject = 20
+)
+
+// listResponse wraps list results with metadata for agent protection.
+type listResponse struct {
+	Count         int    `json:"count"`
+	HasMore       bool   `json:"has_more,omitempty"`
+	Items         any    `json:"items"`
+	AutoCompacted bool   `json:"auto_compacted,omitempty"`
+	Message       string `json:"message,omitempty"`
+}
+
+// protectedListResult wraps list items in a response envelope with size protection.
+// If the serialized response exceeds maxResponseChars, it auto-compacts using compactFn.
+// Pass compactFn=nil if there is no compact form for this type.
+func protectedListResult(items any, count int, hasMore bool, compactFn func() any) (*mcp.CallToolResult, any, error) {
+	resp := listResponse{
+		Count:   count,
+		HasMore: hasMore,
+		Items:   items,
+	}
+	data, _ := json.MarshalIndent(resp, "", "  ")
+	if len(data) > maxResponseChars && compactFn != nil {
+		resp.Items = compactFn()
+		resp.AutoCompacted = true
+		resp.Message = "Response exceeded size limit; results returned in compact mode. Use the get endpoint for full details."
+		data, _ = json.MarshalIndent(resp, "", "  ")
+	}
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{&mcp.TextContent{Text: string(data)}},
+	}, nil, nil
+}
+
+// compactDefault returns the effective compact setting, defaulting to true.
+func compactDefault(compact *bool) bool {
+	if compact == nil {
+		return true
+	}
+	return *compact
+}
+
+// applyListDefaults resolves limit and enforces hard cap when compact=false without project.
+func applyListDefaults(limit int, compact bool, hasProject bool) int {
+	if limit == 0 {
+		limit = defaultLimit
+	}
+	if !compact && !hasProject && limit > hardCapNoProject {
+		limit = hardCapNoProject
+	}
+	return limit
+}
+
 type createIssueArgs struct {
 	Title              string   `json:"title"`
 	Description        string   `json:"description"`
@@ -194,13 +250,17 @@ type listIssuesArgs struct {
 	Project   *string `json:"project"`
 	Limit     int     `json:"limit"`
 	SortBy    string  `json:"sort_by"`
-	Compact   bool    `json:"compact,omitempty"`
+	Compact   *bool   `json:"compact,omitempty"`
 	Pinned    bool    `json:"pinned,omitempty"`
 }
 
 func (h *Handlers) ListIssues(ctx context.Context, _ *mcp.CallToolRequest, args listIssuesArgs) (*mcp.CallToolResult, any, error) {
+	compact := compactDefault(args.Compact)
+	hasProject := strSet(args.Project)
+	limit := applyListDefaults(args.Limit, compact, hasProject)
+
 	filter := model.IssueFilter{
-		Limit:  args.Limit,
+		Limit:  limit + 1, // fetch one extra to detect truncation
 		SortBy: args.SortBy,
 	}
 	if args.Status != "" {
@@ -217,7 +277,7 @@ func (h *Handlers) ListIssues(ctx context.Context, _ *mcp.CallToolRequest, args 
 	if args.Assignee != "" {
 		filter.Assignee = &args.Assignee
 	}
-	if strSet(args.Project) {
+	if hasProject {
 		resolved, err := resolveProjectSlug(ctx, h.store, *args.Project)
 		if err != nil {
 			return errResult(err)
@@ -228,18 +288,24 @@ func (h *Handlers) ListIssues(ctx context.Context, _ *mcp.CallToolRequest, args 
 		t := true
 		filter.Pinned = &t
 	}
-	if filter.Limit == 0 {
-		filter.Limit = 50
-	}
 
 	issues, err := h.store.ListIssues(ctx, filter)
 	if err != nil {
 		return errResult(err)
 	}
-	if args.Compact {
-		return jsonResult(model.ToCompactList(issues))
+
+	hasMore := len(issues) > limit
+	if hasMore {
+		issues = issues[:limit]
 	}
-	return jsonResult(issues)
+
+	if compact {
+		compactItems := model.ToCompactList(issues)
+		return protectedListResult(compactItems, len(compactItems), hasMore, nil)
+	}
+	return protectedListResult(issues, len(issues), hasMore, func() any {
+		return model.ToCompactList(issues)
+	})
 }
 
 type deleteIssueArgs struct {
@@ -256,16 +322,16 @@ func (h *Handlers) DeleteIssue(ctx context.Context, _ *mcp.CallToolRequest, args
 type readyArgs struct {
 	Limit   int     `json:"limit"`
 	Project *string `json:"project"`
-	Compact bool    `json:"compact,omitempty"`
+	Compact *bool   `json:"compact,omitempty"`
 }
 
 func (h *Handlers) Ready(ctx context.Context, _ *mcp.CallToolRequest, args readyArgs) (*mcp.CallToolResult, any, error) {
-	limit := args.Limit
-	if limit == 0 {
-		limit = 20
-	}
-	filter := model.IssueFilter{Limit: limit}
-	if strSet(args.Project) {
+	compact := compactDefault(args.Compact)
+	hasProject := strSet(args.Project)
+	limit := applyListDefaults(args.Limit, compact, hasProject)
+
+	filter := model.IssueFilter{Limit: limit + 1}
+	if hasProject {
 		resolved, err := resolveProjectSlug(ctx, h.store, *args.Project)
 		if err != nil {
 			return errResult(err)
@@ -276,10 +342,19 @@ func (h *Handlers) Ready(ctx context.Context, _ *mcp.CallToolRequest, args ready
 	if err != nil {
 		return errResult(err)
 	}
-	if args.Compact {
-		return jsonResult(model.ToCompactList(issues))
+
+	hasMore := len(issues) > limit
+	if hasMore {
+		issues = issues[:limit]
 	}
-	return jsonResult(issues)
+
+	if compact {
+		compactItems := model.ToCompactList(issues)
+		return protectedListResult(compactItems, len(compactItems), hasMore, nil)
+	}
+	return protectedListResult(issues, len(issues), hasMore, func() any {
+		return model.ToCompactList(issues)
+	})
 }
 
 type addDepArgs struct {
@@ -369,7 +444,7 @@ func (h *Handlers) ListComments(ctx context.Context, _ *mcp.CallToolRequest, arg
 	if err != nil {
 		return errResult(err)
 	}
-	return jsonResult(comments)
+	return protectedListResult(comments, len(comments), false, nil)
 }
 
 type labelArgs struct {

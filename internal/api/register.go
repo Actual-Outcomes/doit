@@ -31,7 +31,9 @@ func RegisterAgentTools(server *mcp.Server, h *Handlers) {
 			"Supports sorting by priority, oldest, updated, or hybrid. " +
 			"Use project slug to scope results to a single project. " +
 			"Set compact=true for minimal responses that save context window tokens. " +
-			"Set pinned=true to retrieve only pinned issues for fast orientation.",
+			"Set pinned=true to retrieve only pinned issues for fast orientation. " +
+			"Returns {count, has_more, items} envelope. " +
+			"Defaults: compact=true, limit=50. Without project filter and compact=false, hard cap at 20 items.",
 	}, h.ListIssues)
 
 	mcp.AddTool(server, &mcp.Tool{
@@ -46,7 +48,9 @@ func RegisterAgentTools(server *mcp.Server, h *Handlers) {
 		Description: "List issues ready for work — open, not blocked, not deferred. " +
 			"Call this to find the next task to work on. " +
 			"Use project slug to scope results to a single project. " +
-			"Set compact=true for minimal responses that save context window tokens.",
+			"Set compact=true for minimal responses that save context window tokens. " +
+			"Returns {count, has_more, items} envelope. " +
+			"Defaults: compact=true, limit=50. Without project filter and compact=false, hard cap at 20 items.",
 	}, h.Ready)
 
 	// --- Dependencies ---
@@ -129,7 +133,9 @@ func RegisterAgentTools(server *mcp.Server, h *Handlers) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "doit_list_lessons",
 		Description: "List lessons learned, filtered by project, status, expert, component, or severity. " +
-			"Review before starting work to avoid repeating mistakes.",
+			"Review before starting work to avoid repeating mistakes. " +
+			"Returns {count, has_more, items} envelope. " +
+			"Defaults: compact=true, limit=50.",
 	}, h.ListLessons)
 
 	mcp.AddTool(server, &mcp.Tool{

@@ -134,14 +134,14 @@ This project uses Doit for persistent work tracking via MCP.
   <tr><td><code>doit_create_issue</code></td><td>Create a new work item (task, bug, feature, epic, etc). Returns the created issue with its hash-based ID. Use <code>parent_id</code> to create a hierarchical child (e.g. epic.1). Use <code>project</code> (slug) to assign to a project.</td></tr>
   <tr><td><code>doit_get_issue</code></td><td>Get full details of an issue including labels, dependencies, and parent.</td></tr>
   <tr><td><code>doit_update_issue</code></td><td>Update fields on an existing issue. Only specified fields are changed. Use claim=true to atomically set assignee and status to in_progress.</td></tr>
-  <tr><td><code>doit_list_issues</code></td><td>List issues with filtering by status, type, priority, assignee, and labels. Supports sorting by priority, oldest, updated, or hybrid. Use <code>project</code> (slug) to scope results. Set <code>compact=true</code> for minimal fields. Set <code>pinned=true</code> to retrieve only pinned issues for fast orientation.</td></tr>
+  <tr><td><code>doit_list_issues</code></td><td>List issues with filtering by status, type, priority, assignee, and labels. Supports sorting by priority, oldest, updated, or hybrid. Use <code>project</code> (slug) to scope results. Set <code>pinned=true</code> to retrieve only pinned issues. Returns <code>{count, has_more, items}</code> envelope. Defaults: <code>compact=true</code>, <code>limit=50</code>. Without project filter and <code>compact=false</code>, hard cap at 20 items. Oversized responses auto-compact.</td></tr>
   <tr><td><code>doit_delete_issue</code></td><td>Delete an issue. Cascades to dependencies, labels, comments, and events.</td></tr>
 </table>
 
 <h3>Ready Detection</h3>
 <table>
   <tr><th>Tool</th><th>Description</th></tr>
-  <tr><td><code>doit_ready</code></td><td>List issues ready for work — open, not blocked, not deferred. Call this to find the next task to work on. Use <code>project</code> (slug) to scope results. Set <code>compact=true</code> to return only id, title, type, status, priority, assignee, owner, labels.</td></tr>
+  <tr><td><code>doit_ready</code></td><td>List issues ready for work — open, not blocked, not deferred. Call this to find the next task to work on. Use <code>project</code> (slug) to scope results. Returns <code>{count, has_more, items}</code> envelope. Defaults: <code>compact=true</code>, <code>limit=50</code>. Without project filter and <code>compact=false</code>, hard cap at 20 items.</td></tr>
 </table>
 
 <h3>Dependencies</h3>
@@ -184,7 +184,7 @@ This project uses Doit for persistent work tracking via MCP.
 <table>
   <tr><th>Tool</th><th>Description</th></tr>
   <tr><td><code>doit_record_lesson</code></td><td>Record a lesson learned — a mistake and its correction. Required: <code>title</code>, <code>mistake</code>, <code>correction</code>. Optional: <code>project</code> (slug), <code>issue_id</code>, <code>expert</code>, <code>components</code>, <code>severity</code>, <code>created_by</code>.</td></tr>
-  <tr><td><code>doit_list_lessons</code></td><td>List lessons learned. All filters optional: <code>project</code> (slug), <code>status</code>, <code>expert</code>, <code>component</code>, <code>severity</code>, <code>limit</code>.</td></tr>
+  <tr><td><code>doit_list_lessons</code></td><td>List lessons learned. All filters optional: <code>project</code> (slug), <code>status</code>, <code>expert</code>, <code>component</code>, <code>severity</code>, <code>limit</code>, <code>compact</code>. Returns <code>{count, has_more, items}</code> envelope. Defaults: <code>compact=true</code>, <code>limit=50</code>.</td></tr>
   <tr><td><code>doit_resolve_lesson</code></td><td>Mark a lesson as resolved. Required: <code>id</code>. Optional: <code>resolved_by</code>.</td></tr>
 </table>
 
@@ -294,6 +294,25 @@ Flags survive session reset and are queryable across agent sessions.</p>
 
 <h3>Priority</h3>
 <p>Integer 0&ndash;4 where 0 is critical and 4 is backlog. Default: 2 (medium).</p>
+
+<h2>Response Format</h2>
+
+<h3>List Response Envelope</h3>
+<p>All list endpoints (<code>doit_list_issues</code>, <code>doit_ready</code>, <code>doit_list_lessons</code>, <code>doit_list_comments</code>) return a response envelope:</p>
+<pre><code>{
+  "count": 12,        // Number of items in this response
+  "has_more": true,   // True if more items exist beyond the limit
+  "items": [...]      // The actual items (compact or full)
+}</code></pre>
+
+<h3>Response Size Protection</h3>
+<p>List endpoints include server-side protection against oversized responses that can crash agent sessions:</p>
+<ul>
+  <li><strong>Default compact=true</strong> — all list endpoints return compact results by default. Set <code>compact=false</code> for full details.</li>
+  <li><strong>Default limit=50</strong> — maximum items returned per call.</li>
+  <li><strong>Hard cap at 20</strong> — when <code>compact=false</code> without a <code>project</code> filter, limit is capped at 20 to prevent oversized responses.</li>
+  <li><strong>Auto-compact fallback</strong> — if a response exceeds 50K characters, it is automatically re-serialized in compact mode with <code>"auto_compacted": true</code> and a message.</li>
+</ul>
 
 <h2>Key Concepts</h2>
 

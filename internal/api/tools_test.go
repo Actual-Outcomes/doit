@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/Actual-Outcomes/doit/internal/model"
@@ -380,7 +381,8 @@ func TestListIssues_Compact(t *testing.T) {
 		Description: "full description here",
 	}
 
-	result, _, err := h.ListIssues(context.Background(), nil, listIssuesArgs{Compact: true})
+	compact := true
+	result, _, err := h.ListIssues(context.Background(), nil, listIssuesArgs{Compact: &compact})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -406,7 +408,8 @@ func TestListIssues_Full(t *testing.T) {
 		Description: "full description here",
 	}
 
-	result, _, err := h.ListIssues(context.Background(), nil, listIssuesArgs{})
+	compact := false
+	result, _, err := h.ListIssues(context.Background(), nil, listIssuesArgs{Compact: &compact})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -433,13 +436,13 @@ func TestListIssues_PinnedFilter(t *testing.T) {
 		t.Error("should include pinned issue")
 	}
 
-	// Parse response to verify only one issue returned
-	var issues []model.Issue
-	if err := json.Unmarshal([]byte(text), &issues); err != nil {
-		t.Fatalf("failed to parse response: %v", err)
+	// Parse response envelope to verify count
+	var resp listResponse
+	if err := json.Unmarshal([]byte(text), &resp); err != nil {
+		t.Fatalf("failed to parse response envelope: %v", err)
 	}
-	if len(issues) != 1 {
-		t.Errorf("expected 1 pinned issue, got %d", len(issues))
+	if resp.Count != 1 {
+		t.Errorf("expected count=1, got %d", resp.Count)
 	}
 }
 
@@ -453,7 +456,8 @@ func TestReady_Compact(t *testing.T) {
 		Description: "should not appear",
 	}
 
-	result, _, err := h.Ready(context.Background(), nil, readyArgs{Compact: true})
+	compact := true
+	result, _, err := h.Ready(context.Background(), nil, readyArgs{Compact: &compact})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -975,6 +979,237 @@ func TestStrSet(t *testing.T) {
 }
 
 func strPtr(s string) *string { return &s }
+func boolPtr(b bool) *bool   { return &b }
+
+// --- Response protection tests ---
+
+func TestListIssues_DefaultCompact(t *testing.T) {
+	// When compact is not set (nil), default should be compact=true
+	ms := newMockStore()
+	h := NewHandlers(ms)
+	ms.issues["a"] = &model.Issue{
+		ID:          "a",
+		Title:       "Task A",
+		Status:      model.StatusOpen,
+		Description: "should not appear in compact",
+	}
+
+	result, _, err := h.ListIssues(context.Background(), nil, listIssuesArgs{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	text := result.Content[0].(*mcp.TextContent).Text
+	if contains(text, "should not appear in compact") {
+		t.Error("default compact=true should exclude description")
+	}
+	if !contains(text, "Task A") {
+		t.Error("compact response should include title")
+	}
+}
+
+func TestListIssues_ResponseEnvelope(t *testing.T) {
+	// Verify response contains count and items fields
+	ms := newMockStore()
+	h := NewHandlers(ms)
+	ms.issues["a"] = &model.Issue{ID: "a", Title: "Task A", Status: model.StatusOpen}
+	ms.issues["b"] = &model.Issue{ID: "b", Title: "Task B", Status: model.StatusOpen}
+
+	result, _, err := h.ListIssues(context.Background(), nil, listIssuesArgs{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	text := result.Content[0].(*mcp.TextContent).Text
+	var resp listResponse
+	if err := json.Unmarshal([]byte(text), &resp); err != nil {
+		t.Fatalf("failed to parse response envelope: %v", err)
+	}
+	if resp.Count != 2 {
+		t.Errorf("count = %d, want 2", resp.Count)
+	}
+	if resp.HasMore {
+		t.Error("has_more should be false for small result set")
+	}
+}
+
+func TestListIssues_HardCapNoProject(t *testing.T) {
+	// When compact=false and no project filter, hard cap at 20
+	ms := newMockStore()
+	h := NewHandlers(ms)
+	// Add 25 issues
+	for i := 0; i < 25; i++ {
+		id := fmt.Sprintf("issue-%d", i)
+		ms.issues[id] = &model.Issue{ID: id, Title: fmt.Sprintf("Task %d", i), Status: model.StatusOpen}
+	}
+
+	compact := false
+	result, _, err := h.ListIssues(context.Background(), nil, listIssuesArgs{Compact: &compact})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	text := result.Content[0].(*mcp.TextContent).Text
+	var resp listResponse
+	if err := json.Unmarshal([]byte(text), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp.Count > hardCapNoProject {
+		t.Errorf("count = %d, should be capped at %d without project filter", resp.Count, hardCapNoProject)
+	}
+	if !resp.HasMore {
+		t.Error("has_more should be true when results are truncated")
+	}
+}
+
+func TestReady_DefaultCompact(t *testing.T) {
+	ms := newMockStore()
+	h := NewHandlers(ms)
+	ms.issues["a"] = &model.Issue{
+		ID:          "a",
+		Title:       "Ready task",
+		Status:      model.StatusOpen,
+		Description: "hidden by default",
+	}
+
+	result, _, err := h.Ready(context.Background(), nil, readyArgs{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	text := result.Content[0].(*mcp.TextContent).Text
+	if contains(text, "hidden by default") {
+		t.Error("default compact=true should exclude description from ready")
+	}
+}
+
+func TestReady_ResponseEnvelope(t *testing.T) {
+	ms := newMockStore()
+	h := NewHandlers(ms)
+	ms.issues["a"] = &model.Issue{ID: "a", Title: "Ready", Status: model.StatusOpen}
+
+	result, _, err := h.Ready(context.Background(), nil, readyArgs{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	text := result.Content[0].(*mcp.TextContent).Text
+	var resp listResponse
+	if err := json.Unmarshal([]byte(text), &resp); err != nil {
+		t.Fatalf("failed to parse envelope: %v", err)
+	}
+	if resp.Count != 1 {
+		t.Errorf("count = %d, want 1", resp.Count)
+	}
+}
+
+func TestListLessons_DefaultCompact(t *testing.T) {
+	ms := newMockStore()
+	h := NewHandlers(ms)
+
+	result, _, err := h.ListLessons(context.Background(), nil, listLessonsArgs{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatal("expected success")
+	}
+
+	text := result.Content[0].(*mcp.TextContent).Text
+	var resp listResponse
+	if err := json.Unmarshal([]byte(text), &resp); err != nil {
+		t.Fatalf("failed to parse envelope: %v", err)
+	}
+	// Empty result should still have the envelope
+	if resp.Count != 0 {
+		t.Errorf("count = %d, want 0", resp.Count)
+	}
+}
+
+func TestListComments_ResponseEnvelope(t *testing.T) {
+	ms := newMockStore()
+	h := NewHandlers(ms)
+
+	result, _, err := h.ListComments(context.Background(), nil, listCommentsArgs{IssueID: "x"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	text := result.Content[0].(*mcp.TextContent).Text
+	var resp listResponse
+	if err := json.Unmarshal([]byte(text), &resp); err != nil {
+		t.Fatalf("failed to parse envelope: %v", err)
+	}
+}
+
+func TestProtectedListResult_AutoCompact(t *testing.T) {
+	// Create a large result that exceeds maxResponseChars
+	issues := make([]model.Issue, 0, 100)
+	for i := 0; i < 100; i++ {
+		issues = append(issues, model.Issue{
+			ID:          fmt.Sprintf("issue-%d", i),
+			Title:       fmt.Sprintf("Task %d with a moderately long title for size testing", i),
+			Description: fmt.Sprintf("This is a very long description that takes up lots of space. %s", strings.Repeat("x", 500)),
+			Status:      model.StatusOpen,
+			IssueType:   model.TypeTask,
+		})
+	}
+
+	result, _, err := protectedListResult(issues, len(issues), false, func() any {
+		return model.ToCompactList(issues)
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	text := result.Content[0].(*mcp.TextContent).Text
+	var resp listResponse
+	if err := json.Unmarshal([]byte(text), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+
+	if !resp.AutoCompacted {
+		t.Error("should have auto-compacted the oversized response")
+	}
+	if resp.Message == "" {
+		t.Error("should include a message about auto-compaction")
+	}
+	// Compacted response should not contain the long descriptions
+	if contains(text, "very long description") {
+		t.Error("auto-compacted response should not contain full descriptions")
+	}
+}
+
+func TestApplyListDefaults(t *testing.T) {
+	// Default limit
+	if got := applyListDefaults(0, true, false); got != defaultLimit {
+		t.Errorf("default limit = %d, want %d", got, defaultLimit)
+	}
+	// Hard cap when compact=false, no project
+	if got := applyListDefaults(50, false, false); got != hardCapNoProject {
+		t.Errorf("hard cap = %d, want %d", got, hardCapNoProject)
+	}
+	// No cap when project is set
+	if got := applyListDefaults(50, false, true); got != 50 {
+		t.Errorf("with project = %d, want 50", got)
+	}
+	// No cap when compact=true
+	if got := applyListDefaults(50, true, false); got != 50 {
+		t.Errorf("compact=true = %d, want 50", got)
+	}
+}
+
+func TestCompactDefault(t *testing.T) {
+	if !compactDefault(nil) {
+		t.Error("nil should default to true")
+	}
+	if !compactDefault(boolPtr(true)) {
+		t.Error("true should be true")
+	}
+	if compactDefault(boolPtr(false)) {
+		t.Error("false should be false")
+	}
+}
 
 // helper
 func contains(s, substr string) bool {

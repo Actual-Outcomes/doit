@@ -63,12 +63,24 @@ type listLessonsArgs struct {
 	Component *string `json:"component,omitempty"`
 	Severity  *int    `json:"severity,omitempty"`
 	Limit     *int    `json:"limit,omitempty"`
+	Compact   *bool   `json:"compact,omitempty"`
 }
 
 func (h *Handlers) ListLessons(ctx context.Context, _ *mcp.CallToolRequest, args listLessonsArgs) (*mcp.CallToolResult, any, error) {
-	filter := model.LessonFilter{}
+	compact := compactDefault(args.Compact)
+	hasProject := strSet(args.Project)
 
-	if strSet(args.Project) {
+	limit := defaultLimit
+	if args.Limit != nil {
+		limit = *args.Limit
+	}
+	limit = applyListDefaults(limit, compact, hasProject)
+
+	filter := model.LessonFilter{
+		Limit: limit + 1, // fetch one extra to detect truncation
+	}
+
+	if hasProject {
 		resolved, err := resolveProjectSlug(ctx, h.store, *args.Project)
 		if err != nil {
 			return errResult(err)
@@ -88,15 +100,24 @@ func (h *Handlers) ListLessons(ctx context.Context, _ *mcp.CallToolRequest, args
 	if args.Severity != nil {
 		filter.Severity = args.Severity
 	}
-	if args.Limit != nil {
-		filter.Limit = *args.Limit
-	}
 
 	lessons, err := h.store.ListLessons(ctx, filter)
 	if err != nil {
 		return errResult(fmt.Errorf("listing lessons: %w", err))
 	}
-	return jsonResult(lessons)
+
+	hasMore := len(lessons) > limit
+	if hasMore {
+		lessons = lessons[:limit]
+	}
+
+	if compact {
+		compactItems := model.ToCompactLessonList(lessons)
+		return protectedListResult(compactItems, len(compactItems), hasMore, nil)
+	}
+	return protectedListResult(lessons, len(lessons), hasMore, func() any {
+		return model.ToCompactLessonList(lessons)
+	})
 }
 
 type resolveLessonArgs struct {

@@ -33,6 +33,35 @@ type Lesson struct {
 	ResolvedBy string       `json:"resolved_by,omitempty"`
 }
 
+// CompactLesson is a minimal representation of a Lesson for list responses.
+type CompactLesson struct {
+	ID       string       `json:"id"`
+	Title    string       `json:"title"`
+	Status   LessonStatus `json:"status"`
+	Severity int          `json:"severity"`
+	Expert   string       `json:"expert,omitempty"`
+}
+
+// ToCompact converts a Lesson to its compact form.
+func (l *Lesson) ToCompact() CompactLesson {
+	return CompactLesson{
+		ID:       l.ID,
+		Title:    l.Title,
+		Status:   l.Status,
+		Severity: l.Severity,
+		Expert:   l.Expert,
+	}
+}
+
+// ToCompactLessonList converts a slice of Lessons to CompactLessons.
+func ToCompactLessonList(lessons []Lesson) []CompactLesson {
+	out := make([]CompactLesson, len(lessons))
+	for i := range lessons {
+		out[i] = lessons[i].ToCompact()
+	}
+	return out
+}
+
 // LessonFilter provides filtering for lesson queries.
 type LessonFilter struct {
 	ProjectID *string
