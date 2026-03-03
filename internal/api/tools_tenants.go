@@ -87,6 +87,101 @@ func (h *Handlers) ListAPIKeys(ctx context.Context, _ *mcp.CallToolRequest, args
 	return jsonResult(keys)
 }
 
+type updateTenantArgs struct {
+	Tenant string  `json:"tenant"`
+	Name   *string `json:"name,omitempty"`
+	Slug   *string `json:"slug,omitempty"`
+}
+
+func (h *Handlers) UpdateTenant(ctx context.Context, _ *mcp.CallToolRequest, args updateTenantArgs) (*mcp.CallToolResult, any, error) {
+	// Resolve tenant slug to ID
+	tenants, err := h.store.ListTenants(ctx)
+	if err != nil {
+		return errResult(err)
+	}
+	var tenantID string
+	for _, t := range tenants {
+		if t.Slug == args.Tenant {
+			tenantID = t.ID.String()
+			break
+		}
+	}
+	if tenantID == "" {
+		return errResult(fmt.Errorf("tenant %q not found", args.Tenant))
+	}
+
+	tenant, err := h.store.UpdateTenant(ctx, tenantID, args.Name, args.Slug)
+	if err != nil {
+		return errResult(err)
+	}
+	return jsonResult(tenant)
+}
+
+type rotateAdminKeyArgs struct{}
+
+func (h *Handlers) RotateAdminKey(ctx context.Context, _ *mcp.CallToolRequest, _ rotateAdminKeyArgs) (*mcp.CallToolResult, any, error) {
+	// Generate new raw key
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return errResult(fmt.Errorf("generating key: %w", err))
+	}
+	rawKey := hex.EncodeToString(raw)
+	keyHash := auth.HashKey(rawKey)
+
+	// Store hash in config table
+	if err := h.store.SetConfig(ctx, "admin_key_hash", keyHash); err != nil {
+		return errResult(err)
+	}
+
+	result := map[string]string{
+		"raw_key": rawKey,
+		"message": "Admin key rotated. The old DB-stored key is invalidated. Env var key still works as fallback.",
+	}
+	return jsonResult(result)
+}
+
+type deleteProjectArgs struct {
+	Project string `json:"project"`
+}
+
+func (h *Handlers) AdminDeleteProject(ctx context.Context, _ *mcp.CallToolRequest, args deleteProjectArgs) (*mcp.CallToolResult, any, error) {
+	projectID, err := resolveProjectSlug(ctx, h.store, args.Project)
+	if err != nil {
+		return errResult(err)
+	}
+	if err := h.store.DeleteProject(ctx, projectID); err != nil {
+		return errResult(err)
+	}
+	return jsonResult(map[string]string{"deleted": args.Project})
+}
+
+type deleteTenantArgs struct {
+	Tenant string `json:"tenant"`
+}
+
+func (h *Handlers) DeleteTenant(ctx context.Context, _ *mcp.CallToolRequest, args deleteTenantArgs) (*mcp.CallToolResult, any, error) {
+	// Resolve tenant slug to ID
+	tenants, err := h.store.ListTenants(ctx)
+	if err != nil {
+		return errResult(err)
+	}
+	var tenantID string
+	for _, t := range tenants {
+		if t.Slug == args.Tenant {
+			tenantID = t.ID.String()
+			break
+		}
+	}
+	if tenantID == "" {
+		return errResult(fmt.Errorf("tenant %q not found", args.Tenant))
+	}
+
+	if err := h.store.DeleteTenant(ctx, tenantID); err != nil {
+		return errResult(err)
+	}
+	return jsonResult(map[string]string{"deleted": args.Tenant})
+}
+
 type updateProjectArgs struct {
 	Project string  `json:"project"`
 	Name    *string `json:"name,omitempty"`

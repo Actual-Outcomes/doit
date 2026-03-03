@@ -153,6 +153,39 @@ func (s *PgStore) UpdateProject(ctx context.Context, projectID string, name, slu
 	return p, nil
 }
 
+// DeleteProject deletes a project by ID within the tenant.
+// Rejects if any issues still reference the project.
+func (s *PgStore) DeleteProject(ctx context.Context, projectID string) error {
+	ctx, cancel := s.withTimeout(ctx)
+	defer cancel()
+
+	tenantID, ok := auth.TenantFromContext(ctx)
+	if !ok {
+		return fmt.Errorf("no tenant in context")
+	}
+
+	// Check for referencing issues
+	var count int
+	err := s.pool.QueryRow(ctx,
+		"SELECT COUNT(*) FROM issues WHERE project_id = $1", projectID).Scan(&count)
+	if err != nil {
+		return fmt.Errorf("checking project issues: %w", err)
+	}
+	if count > 0 {
+		return fmt.Errorf("cannot delete project: %d issues still reference it", count)
+	}
+
+	tag, err := s.pool.Exec(ctx,
+		"DELETE FROM project WHERE id = $1 AND tenant_id = $2", projectID, tenantID)
+	if err != nil {
+		return fmt.Errorf("deleting project: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("project not found")
+	}
+	return nil
+}
+
 // addProjectFilter appends a project_id filter to a query when allowed projects are set in context.
 // Returns the modified query, args, and argN.
 func addProjectFilter(ctx context.Context, query string, args []any, argN int, column string) (string, []any, int) {

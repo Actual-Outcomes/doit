@@ -53,7 +53,7 @@ resource "aws_apprunner_service" "doit" {
           LOG_LEVEL         = "info"
           ID_PREFIX         = "doit"
           PORT              = "8080"
-          ADMIN_TENANT_SLUG = "default"
+          ADMIN_TENANT_SLUG = "actual-outcomes"
         }
       }
     }

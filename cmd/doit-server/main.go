@@ -55,7 +55,7 @@ func main() {
 	}
 	defer pgStore.Close()
 
-	// MCP servers: agent (23 tools) + admin (6 tools)
+	// MCP servers: agent (20 tools) + admin (8 tools)
 	agentMCP := mcp.NewServer(&mcp.Implementation{
 		Name:    "doit-mcp",
 		Version: version.Number,
@@ -78,8 +78,9 @@ func main() {
 
 	// Auth config
 	authCfg := auth.MiddlewareConfig{
-		AdminKey: cfg.AdminAPIKey,
-		Resolver: pgStore,
+		AdminKey:          cfg.AdminAPIKey,
+		Resolver:          pgStore,
+		AdminKeyHashStore: pgStore,
 	}
 	if cfg.AdminTenantSlug != "" {
 		tenants, err := pgStore.ListTenants(ctx)

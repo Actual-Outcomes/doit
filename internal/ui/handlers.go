@@ -112,12 +112,24 @@ func (h *UIHandlers) LoginSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check admin key first
+	// Check admin key (env var) first
 	if h.adminKey != "" && subtle.ConstantTimeCompare([]byte(apiKey), []byte(h.adminKey)) == 1 {
 		if h.adminTenantID != nil {
 			setSessionCookie(w, *h.adminTenantID, true, h.signingKey)
 			http.Redirect(w, r, "/ui/", http.StatusFound)
 			return
+		}
+	}
+
+	// Check DB-stored admin key hash
+	tokenHash := auth.HashKey(apiKey)
+	if dbHash, err := h.store.GetConfig(r.Context(), "admin_key_hash"); err == nil {
+		if subtle.ConstantTimeCompare([]byte(tokenHash), []byte(dbHash)) == 1 {
+			if h.adminTenantID != nil {
+				setSessionCookie(w, *h.adminTenantID, true, h.signingKey)
+				http.Redirect(w, r, "/ui/", http.StatusFound)
+				return
+			}
 		}
 	}
 
@@ -417,6 +429,9 @@ func (h *UIHandlers) AdminDashboard(w http.ResponseWriter, r *http.Request) {
 		"IsAdmin":   true,
 		"Tenants":   tenants,
 		"Projects":  projects,
+		"Error":     r.URL.Query().Get("error"),
+		"Success":   r.URL.Query().Get("success"),
+		"NewKey":    r.URL.Query().Get("new_key"),
 	}
 	h.render(w, "adminDashboard", data)
 }
@@ -438,6 +453,7 @@ func (h *UIHandlers) AdminTenants(w http.ResponseWriter, r *http.Request) {
 		"Tenants":   tenants,
 		"Error":     r.URL.Query().Get("error"),
 		"Success":   r.URL.Query().Get("success"),
+		"EditID":    r.URL.Query().Get("edit"),
 	}
 	h.render(w, "adminTenants", data)
 }
@@ -460,6 +476,56 @@ func (h *UIHandlers) AdminCreateTenant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, "/ui/admin/tenants?success=Tenant+created", http.StatusFound)
+}
+
+// AdminUpdateTenant handles POST to update a tenant's name/slug.
+func (h *UIHandlers) AdminUpdateTenant(w http.ResponseWriter, r *http.Request) {
+	tenantID := r.FormValue("tenant_id")
+	name := strings.TrimSpace(r.FormValue("name"))
+	slug := strings.TrimSpace(r.FormValue("slug"))
+
+	if name == "" && slug == "" {
+		http.Redirect(w, r, "/ui/admin/tenants?error=Provide+name+or+slug", http.StatusFound)
+		return
+	}
+
+	var namePtr, slugPtr *string
+	if name != "" {
+		namePtr = &name
+	}
+	if slug != "" {
+		slugPtr = &slug
+	}
+
+	_, err := h.store.UpdateTenant(r.Context(), tenantID, namePtr, slugPtr)
+	if err != nil {
+		slog.Error("admin update tenant failed", "error", err)
+		http.Redirect(w, r, "/ui/admin/tenants?error="+err.Error(), http.StatusFound)
+		return
+	}
+
+	http.Redirect(w, r, "/ui/admin/tenants?success=Tenant+updated", http.StatusFound)
+}
+
+// AdminRotateKey handles POST to rotate the admin API key.
+func (h *UIHandlers) AdminRotateKey(w http.ResponseWriter, r *http.Request) {
+	// Generate new raw key
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		http.Redirect(w, r, "/ui/admin/?error=Key+generation+failed", http.StatusFound)
+		return
+	}
+	rawKey := hex.EncodeToString(raw)
+	keyHash := auth.HashKey(rawKey)
+
+	// Store hash in config table
+	if err := h.store.SetConfig(r.Context(), "admin_key_hash", keyHash); err != nil {
+		slog.Error("admin rotate key failed", "error", err)
+		http.Redirect(w, r, "/ui/admin/?error="+err.Error(), http.StatusFound)
+		return
+	}
+
+	http.Redirect(w, r, "/ui/admin/?success=Admin+key+rotated&new_key="+rawKey, http.StatusFound)
 }
 
 // AdminAPIKeys shows API keys for a tenant.
@@ -563,6 +629,46 @@ func (h *UIHandlers) AdminProjects(w http.ResponseWriter, r *http.Request) {
 		"EditID":    r.URL.Query().Get("edit"),
 	}
 	h.render(w, "adminProjects", data)
+}
+
+// AdminDeleteProject handles POST to delete a project.
+func (h *UIHandlers) AdminDeleteProject(w http.ResponseWriter, r *http.Request) {
+	projectID := r.FormValue("project_id")
+	tenantID := r.FormValue("tenant_id")
+
+	if projectID == "" {
+		http.Redirect(w, r, "/ui/admin/projects?error=Project+ID+is+required", http.StatusFound)
+		return
+	}
+
+	// Set tenant context for the delete
+	ctx := auth.WithTenant(r.Context(), uuid.MustParse(tenantID))
+
+	if err := h.store.DeleteProject(ctx, projectID); err != nil {
+		slog.Error("admin delete project failed", "error", err)
+		http.Redirect(w, r, "/ui/admin/projects?error="+err.Error(), http.StatusFound)
+		return
+	}
+
+	http.Redirect(w, r, "/ui/admin/projects?success=Project+deleted", http.StatusFound)
+}
+
+// AdminDeleteTenant handles POST to delete a tenant.
+func (h *UIHandlers) AdminDeleteTenant(w http.ResponseWriter, r *http.Request) {
+	tenantID := r.FormValue("tenant_id")
+
+	if tenantID == "" {
+		http.Redirect(w, r, "/ui/admin/tenants?error=Tenant+ID+is+required", http.StatusFound)
+		return
+	}
+
+	if err := h.store.DeleteTenant(r.Context(), tenantID); err != nil {
+		slog.Error("admin delete tenant failed", "error", err)
+		http.Redirect(w, r, "/ui/admin/tenants?error="+err.Error(), http.StatusFound)
+		return
+	}
+
+	http.Redirect(w, r, "/ui/admin/tenants?success=Tenant+deleted", http.StatusFound)
 }
 
 // AdminUpdateProject handles POST to update a project's name/slug.

@@ -160,7 +160,7 @@ func getProjectCookie(r *http.Request) string {
 }
 
 // SessionMiddleware validates session cookies and redirects to login if invalid.
-// It also injects project filtering into the context if a project cookie is set.
+// It also injects tenant ID and project filtering into the context.
 func SessionMiddleware(signingKey string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -170,26 +170,29 @@ func SessionMiddleware(signingKey string) func(http.Handler) http.Handler {
 				return
 			}
 
-			_, err = verifyCookie(cookie.Value, signingKey)
+			sess, err := verifyCookie(cookie.Value, signingKey)
 			if err != nil {
 				clearSessionCookie(w)
 				http.Redirect(w, r, "/ui/login", http.StatusFound)
 				return
 			}
 
+			// Inject tenant ID into context for store-level isolation
+			ctx := auth.WithTenant(r.Context(), sess.TenantID)
+
 			// Inject project filter if project cookie is set
 			if projectID := getProjectCookie(r); projectID != "" {
-				ctx := auth.WithAllowedProjects(r.Context(), []string{projectID})
-				r = r.WithContext(ctx)
+				ctx = auth.WithAllowedProjects(ctx, []string{projectID})
 			}
 
+			r = r.WithContext(ctx)
 			next.ServeHTTP(w, r)
 		})
 	}
 }
 
 // AdminSessionMiddleware validates that the session belongs to an admin user.
-// Must be used after SessionMiddleware (session is already verified).
+// Injects tenant ID and admin flag into context.
 func AdminSessionMiddleware(signingKey string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -210,6 +213,11 @@ func AdminSessionMiddleware(signingKey string) func(http.Handler) http.Handler {
 				http.Error(w, "Forbidden — admin access required", http.StatusForbidden)
 				return
 			}
+
+			// Inject tenant ID and admin flag into context
+			ctx := auth.WithTenant(r.Context(), sess.TenantID)
+			ctx = auth.WithAdmin(ctx)
+			r = r.WithContext(ctx)
 
 			next.ServeHTTP(w, r)
 		})

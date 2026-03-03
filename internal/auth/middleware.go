@@ -16,11 +16,17 @@ type KeyResolver interface {
 	ResolveAPIKey(ctx context.Context, keyHash string) (uuid.UUID, error)
 }
 
+// AdminKeyHashStore reads the admin key hash from persistent storage.
+type AdminKeyHashStore interface {
+	GetConfig(ctx context.Context, key string) (string, error)
+}
+
 // MiddlewareConfig configures the API key authentication middleware.
 type MiddlewareConfig struct {
-	AdminKey      string
-	AdminTenantID *uuid.UUID
-	Resolver      KeyResolver
+	AdminKey           string
+	AdminTenantID      *uuid.UUID
+	Resolver           KeyResolver
+	AdminKeyHashStore  AdminKeyHashStore
 }
 
 // APIKeyMiddleware authenticates requests via Bearer token.
@@ -44,7 +50,7 @@ func APIKeyMiddleware(cfg MiddlewareConfig) func(http.Handler) http.Handler {
 				return
 			}
 
-			// Check admin key
+			// Check admin key (env var)
 			if cfg.AdminKey != "" && subtle.ConstantTimeCompare([]byte(token), []byte(cfg.AdminKey)) == 1 {
 				ctx := WithAdmin(r.Context())
 				if cfg.AdminTenantID != nil {
@@ -52,6 +58,21 @@ func APIKeyMiddleware(cfg MiddlewareConfig) func(http.Handler) http.Handler {
 				}
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
+			}
+
+			// Check DB-stored admin key hash
+			if cfg.AdminKeyHashStore != nil {
+				tokenHash := HashKey(token)
+				if dbHash, err := cfg.AdminKeyHashStore.GetConfig(r.Context(), "admin_key_hash"); err == nil {
+					if subtle.ConstantTimeCompare([]byte(tokenHash), []byte(dbHash)) == 1 {
+						ctx := WithAdmin(r.Context())
+						if cfg.AdminTenantID != nil {
+							ctx = WithTenant(ctx, *cfg.AdminTenantID)
+						}
+						next.ServeHTTP(w, r.WithContext(ctx))
+						return
+					}
+				}
 			}
 
 			// Hash and resolve tenant key

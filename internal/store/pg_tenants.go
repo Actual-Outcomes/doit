@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/Actual-Outcomes/doit/internal/model"
 	"github.com/google/uuid"
@@ -40,6 +41,47 @@ func (s *PgStore) CreateTenant(ctx context.Context, name, slug string) (*model.T
 	return t, nil
 }
 
+// UpdateTenant updates a tenant's name and/or slug by tenant ID.
+func (s *PgStore) UpdateTenant(ctx context.Context, tenantID string, name, slug *string) (*model.Tenant, error) {
+	ctx, cancel := s.withTimeout(ctx)
+	defer cancel()
+
+	if name == nil && slug == nil {
+		return nil, fmt.Errorf("nothing to update: provide name or slug")
+	}
+
+	sets := []string{}
+	args := []any{}
+	argN := 0
+
+	if name != nil {
+		argN++
+		sets = append(sets, fmt.Sprintf("name = $%d", argN))
+		args = append(args, *name)
+	}
+	if slug != nil {
+		argN++
+		sets = append(sets, fmt.Sprintf("slug = $%d", argN))
+		args = append(args, *slug)
+	}
+
+	argN++
+	args = append(args, tenantID)
+
+	query := fmt.Sprintf(
+		"UPDATE tenant SET %s WHERE id = $%d RETURNING id, name, slug, created_at",
+		strings.Join(sets, ", "), argN,
+	)
+
+	t := &model.Tenant{}
+	err := s.pool.QueryRow(ctx, query, args...).
+		Scan(&t.ID, &t.Name, &t.Slug, &t.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("updating tenant: %w", err)
+	}
+	return t, nil
+}
+
 // ListTenants returns all tenants.
 func (s *PgStore) ListTenants(ctx context.Context) ([]model.Tenant, error) {
 	ctx, cancel := s.withTimeout(ctx)
@@ -61,6 +103,39 @@ func (s *PgStore) ListTenants(ctx context.Context) ([]model.Tenant, error) {
 		tenants = append(tenants, t)
 	}
 	return tenants, rows.Err()
+}
+
+// DeleteTenant deletes a tenant by ID. Rejects if any projects still exist.
+// Cascades to API keys.
+func (s *PgStore) DeleteTenant(ctx context.Context, tenantID string) error {
+	ctx, cancel := s.withTimeout(ctx)
+	defer cancel()
+
+	// Check for existing projects
+	var count int
+	err := s.pool.QueryRow(ctx,
+		"SELECT COUNT(*) FROM project WHERE tenant_id = $1", tenantID).Scan(&count)
+	if err != nil {
+		return fmt.Errorf("checking tenant projects: %w", err)
+	}
+	if count > 0 {
+		return fmt.Errorf("cannot delete tenant: %d projects still exist (delete them first)", count)
+	}
+
+	// Delete API keys first (FK constraint)
+	_, err = s.pool.Exec(ctx, "DELETE FROM api_key WHERE tenant_id = $1", tenantID)
+	if err != nil {
+		return fmt.Errorf("deleting tenant API keys: %w", err)
+	}
+
+	tag, err := s.pool.Exec(ctx, "DELETE FROM tenant WHERE id = $1", tenantID)
+	if err != nil {
+		return fmt.Errorf("deleting tenant: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("tenant not found")
+	}
+	return nil
 }
 
 // CreateAPIKey creates a new API key for a tenant. Returns the key info (not the raw key).

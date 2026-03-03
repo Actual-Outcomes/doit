@@ -557,6 +557,18 @@ const errorPage = `{{define "page"}}
 
 const adminDashboardPage = `{{define "page"}}
 <h1>Admin</h1>
+
+{{if .Error}}<p style="color:#dc2626;margin-bottom:1rem">{{.Error}}</p>{{end}}
+{{if .Success}}<p style="color:#059669;margin-bottom:1rem">{{.Success}}</p>{{end}}
+
+{{if .NewKey}}
+<div style="background:#fefce8;border:2px solid #facc15;border-radius:8px;padding:1rem;margin-bottom:1.5rem">
+  <strong style="color:#854d0e">New Admin Key (shown once):</strong>
+  <div style="margin-top:0.5rem;padding:0.5rem;background:#fff;border-radius:4px;font-family:monospace;font-size:0.9rem;word-break:break-all;user-select:all">{{.NewKey}}</div>
+  <p style="color:#854d0e;font-size:0.85rem;margin-top:0.5rem">Copy this key now. It cannot be retrieved again. The env var key still works as fallback.</p>
+</div>
+{{end}}
+
 <div class="stat-cards">
   <div class="stat-card">
     <div class="label">Tenants</div>
@@ -570,6 +582,14 @@ const adminDashboardPage = `{{define "page"}}
 <div style="display:flex;gap:1rem;margin-bottom:2rem">
   <a href="/ui/admin/tenants" style="padding:0.5rem 1rem;background:#2563eb;color:#fff;border-radius:6px;text-decoration:none">Manage Tenants</a>
   <a href="/ui/admin/projects" style="padding:0.5rem 1rem;background:#2563eb;color:#fff;border-radius:6px;text-decoration:none">Manage Projects</a>
+</div>
+
+<h2>Rotate Admin Key</h2>
+<div class="detail-body">
+  <p style="color:#64748b;font-size:0.9rem;margin-bottom:0.75rem">Generate a new admin API key. The old DB-stored key will be invalidated. The env var (<code>API_KEY</code>) always works as fallback.</p>
+  <form method="POST" action="/ui/admin/rotate-key" onsubmit="return confirm('Rotate admin key? The old DB-stored key will stop working.')">
+    <button type="submit" style="padding:0.4rem 1rem;background:#d97706;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.9rem">Rotate Admin Key</button>
+  </form>
 </div>
 {{end}}`
 
@@ -600,12 +620,36 @@ const adminTenantsPage = `{{define "page"}}
   <thead><tr><th>Name</th><th>Slug</th><th>Created</th><th>Actions</th></tr></thead>
   <tbody>
   {{range .Tenants}}
+  {{if eq (printf "%s" .ID) $.EditID}}
+  <tr>
+    <form method="POST" action="/ui/admin/tenants/update">
+      <input type="hidden" name="tenant_id" value="{{.ID}}">
+      <td><input type="text" name="name" value="{{.Name}}" style="padding:0.3rem 0.5rem;border:1px solid #cbd5e1;border-radius:4px;font-size:0.9rem;width:100%"></td>
+      <td><input type="text" name="slug" value="{{.Slug}}" pattern="[a-z0-9-]+" style="padding:0.3rem 0.5rem;border:1px solid #cbd5e1;border-radius:4px;font-size:0.9rem;width:100%"></td>
+      <td style="color:#64748b;font-size:0.85rem">{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
+      <td>
+        <button type="submit" style="background:#059669;color:#fff;border:none;padding:0.25rem 0.75rem;border-radius:4px;cursor:pointer;font-size:0.8rem">Save</button>
+        <a href="/ui/admin/tenants" style="margin-left:0.5rem;font-size:0.85rem">Cancel</a>
+      </td>
+    </form>
+  </tr>
+  {{else}}
   <tr>
     <td>{{.Name}}</td>
     <td><code>{{.Slug}}</code></td>
     <td style="color:#64748b;font-size:0.85rem">{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
-    <td><a href="/ui/admin/tenants/{{.Slug}}/keys">API Keys</a></td>
+    <td>
+      <a href="/ui/admin/tenants?edit={{.ID}}">Edit</a>
+      &middot;
+      <a href="/ui/admin/tenants/{{.Slug}}/keys">API Keys</a>
+      &middot;
+      <form method="POST" action="/ui/admin/tenants/delete" style="display:inline" onsubmit="return confirm('Delete tenant {{.Name}}? All API keys will be removed. Projects must be deleted first.')">
+        <input type="hidden" name="tenant_id" value="{{.ID}}">
+        <button type="submit" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:0.85rem;padding:0;text-decoration:underline">Delete</button>
+      </form>
+    </td>
   </tr>
+  {{end}}
   {{end}}
   </tbody>
 </table>
@@ -708,7 +752,15 @@ const adminProjectsPage = `{{define "page"}}
     <td><code>{{.Slug}}</code></td>
     <td style="color:#64748b;font-size:0.85rem">{{index $.TenantMap (printf "%s" .TenantID)}}</td>
     <td style="color:#64748b;font-size:0.85rem">{{.CreatedAt.Format "2006-01-02"}}</td>
-    <td><a href="/ui/admin/projects?edit={{.ID}}">Edit</a></td>
+    <td>
+      <a href="/ui/admin/projects?edit={{.ID}}">Edit</a>
+      &middot;
+      <form method="POST" action="/ui/admin/projects/delete" style="display:inline" onsubmit="return confirm('Delete project {{.Name}}? Issues must be deleted first.')">
+        <input type="hidden" name="project_id" value="{{.ID}}">
+        <input type="hidden" name="tenant_id" value="{{.TenantID}}">
+        <button type="submit" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:0.85rem;padding:0;text-decoration:underline">Delete</button>
+      </form>
+    </td>
   </tr>
   {{end}}
   {{end}}

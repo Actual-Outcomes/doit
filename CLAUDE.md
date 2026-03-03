@@ -154,6 +154,7 @@ Risk has two dimensions: **product risk** (will users/data be affected?) and **p
 5. **Never break verification isolation** — Verification Agent must not receive implementation code
 
 ## Available Commands
+- /orc-capture — Lightweight backlog intake
 - /orc-orchestrate — Full 8-phase lifecycle
 - /orc-create-epic — Turn a user need into backlog work packages
 - /orc-init-feature — Feature scaffolding and complexity assessment

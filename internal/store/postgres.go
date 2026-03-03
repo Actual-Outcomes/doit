@@ -11,6 +11,7 @@ import (
 
 	"github.com/Actual-Outcomes/doit/internal/auth"
 	"github.com/Actual-Outcomes/doit/internal/model"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -106,6 +107,10 @@ func (s *PgStore) GenerateID(ctx context.Context, prefix string) (string, error)
 // NextChildID returns the next hierarchical child ID for a parent.
 // e.g. parent "doit-abc" → "doit-abc.1", "doit-abc.2", etc.
 func (s *PgStore) NextChildID(ctx context.Context, parentID string) (string, error) {
+	if err := s.validateIssueOwnership(ctx, parentID); err != nil {
+		return "", err
+	}
+
 	ctx, cancel := s.withTimeout(ctx)
 	defer cancel()
 
@@ -134,6 +139,11 @@ func (s *PgStore) NextChildID(ctx context.Context, parentID string) (string, err
 
 // CreateIssue inserts a new issue and optionally creates a parent-child dependency.
 func (s *PgStore) CreateIssue(ctx context.Context, input CreateIssueInput) (*model.Issue, error) {
+	tid, err := requireTenant(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	ctx, cancel := s.withTimeout(ctx)
 	defer cancel()
 
@@ -164,6 +174,7 @@ func (s *PgStore) CreateIssue(ctx context.Context, input CreateIssueInput) (*mod
 		MolType:   input.MolType,
 		WorkType:  input.WorkType,
 		WispType:  input.WispType,
+		TenantID:  tid.String(),
 		ProjectID: input.ProjectID,
 	}
 
@@ -173,15 +184,15 @@ func (s *PgStore) CreateIssue(ctx context.Context, input CreateIssueInput) (*mod
 	_, err = tx.Exec(ctx,
 		`INSERT INTO issues (id, content_hash, title, description, design, acceptance_criteria,
 		 notes, status, priority, issue_type, assignee, owner, created_at, created_by,
-		 updated_at, ephemeral, mol_type, work_type, wisp_type, project_id)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
+		 updated_at, ephemeral, mol_type, work_type, wisp_type, tenant_id, project_id)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)`,
 		issue.ID, issue.ContentHash, issue.Title, issue.Description, issue.Design,
 		issue.AcceptanceCriteria, issue.Notes, issue.Status, issue.Priority,
 		issue.IssueType, nullEmpty(issue.Assignee), nullEmpty(issue.Owner),
 		issue.CreatedAt, nullEmpty(issue.CreatedBy), issue.UpdatedAt,
 		issue.Ephemeral, nullEmpty(string(issue.MolType)),
 		nullEmpty(string(issue.WorkType)), nullEmpty(string(issue.WispType)),
-		nullEmpty(input.ProjectID))
+		tid, nullEmpty(input.ProjectID))
 	if err != nil {
 		return nil, fmt.Errorf("inserting issue: %w", err)
 	}
@@ -227,11 +238,16 @@ func (s *PgStore) CreateIssue(ctx context.Context, input CreateIssueInput) (*mod
 
 // GetIssue retrieves an issue by ID with labels, dependencies, and parent.
 func (s *PgStore) GetIssue(ctx context.Context, id string) (*model.Issue, error) {
+	tid, err := requireTenant(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	ctx, cancel := s.withTimeout(ctx)
 	defer cancel()
 
 	issue, err := s.scanIssue(ctx, s.pool,
-		`SELECT `+issueColumns+` FROM issues WHERE id = $1`, id)
+		`SELECT `+issueColumns+` FROM issues WHERE id = $1 AND tenant_id = $2`, id, tid)
 	if err != nil {
 		return nil, fmt.Errorf("getting issue %s: %w", id, err)
 	}
@@ -256,6 +272,11 @@ func (s *PgStore) GetIssue(ctx context.Context, id string) (*model.Issue, error)
 
 // UpdateIssue applies partial updates to an issue.
 func (s *PgStore) UpdateIssue(ctx context.Context, id string, input UpdateIssueInput) (*model.Issue, error) {
+	tid, err := requireTenant(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	ctx, cancel := s.withTimeout(ctx)
 	defer cancel()
 
@@ -318,8 +339,11 @@ func (s *PgStore) UpdateIssue(ctx context.Context, id string, input UpdateIssueI
 
 	argN++
 	args = append(args, id)
-	query := fmt.Sprintf("UPDATE issues SET %s WHERE id = $%d RETURNING %s",
-		strings.Join(sets, ", "), argN, issueColumns)
+	idArg := argN
+	argN++
+	args = append(args, tid)
+	query := fmt.Sprintf("UPDATE issues SET %s WHERE id = $%d AND tenant_id = $%d RETURNING %s",
+		strings.Join(sets, ", "), idArg, argN, issueColumns)
 
 	issue, err := s.scanIssue(ctx, tx, query, args...)
 	if err != nil {
@@ -335,12 +359,17 @@ func (s *PgStore) UpdateIssue(ctx context.Context, id string, input UpdateIssueI
 
 // ListIssues returns issues matching the filter.
 func (s *PgStore) ListIssues(ctx context.Context, filter model.IssueFilter) ([]model.Issue, error) {
+	tid, err := requireTenant(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	ctx, cancel := s.withTimeout(ctx)
 	defer cancel()
 
-	query := "SELECT " + issueColumns + " FROM issues WHERE 1=1"
-	args := []any{}
-	argN := 0
+	query := "SELECT " + issueColumns + " FROM issues WHERE tenant_id = $1"
+	args := []any{tid}
+	argN := 1
 
 	addWhere := func(clause string, val any) {
 		argN++
@@ -421,14 +450,19 @@ func (s *PgStore) ListIssues(ctx context.Context, filter model.IssueFilter) ([]m
 
 // ListReady returns issues from the ready_issues view.
 func (s *PgStore) ListReady(ctx context.Context, filter model.IssueFilter) ([]model.Issue, error) {
+	tid, err := requireTenant(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	ctx, cancel := s.withTimeout(ctx)
 	defer cancel()
 
 	query := "SELECT " + issueColumns + " FROM ready_issues"
-	args := []any{}
-	argN := 0
+	args := []any{tid}
+	argN := 1
 
-	where := []string{}
+	where := []string{"tenant_id = $1"}
 	if filter.IssueType != nil {
 		argN++
 		where = append(where, fmt.Sprintf("issue_type = $%d", argN))
@@ -475,10 +509,15 @@ func (s *PgStore) ListReady(ctx context.Context, filter model.IssueFilter) ([]mo
 
 // DeleteIssue removes an issue and cascades to dependencies, labels, etc.
 func (s *PgStore) DeleteIssue(ctx context.Context, id string) error {
+	tid, err := requireTenant(ctx)
+	if err != nil {
+		return err
+	}
+
 	ctx, cancel := s.withTimeout(ctx)
 	defer cancel()
 
-	tag, err := s.pool.Exec(ctx, "DELETE FROM issues WHERE id = $1", id)
+	tag, err := s.pool.Exec(ctx, "DELETE FROM issues WHERE id = $1 AND tenant_id = $2", id, tid)
 	if err != nil {
 		return fmt.Errorf("deleting issue: %w", err)
 	}
@@ -491,6 +530,13 @@ func (s *PgStore) DeleteIssue(ctx context.Context, id string) error {
 // --- Dependencies ---
 
 func (s *PgStore) AddDependency(ctx context.Context, input AddDependencyInput) (*model.Dependency, error) {
+	if err := s.validateIssueOwnership(ctx, input.IssueID); err != nil {
+		return nil, err
+	}
+	if err := s.validateIssueOwnership(ctx, input.DependsOnID); err != nil {
+		return nil, err
+	}
+
 	ctx, cancel := s.withTimeout(ctx)
 	defer cancel()
 
@@ -518,6 +564,10 @@ func (s *PgStore) AddDependency(ctx context.Context, input AddDependencyInput) (
 }
 
 func (s *PgStore) RemoveDependency(ctx context.Context, issueID, dependsOnID string) error {
+	if err := s.validateIssueOwnership(ctx, issueID); err != nil {
+		return err
+	}
+
 	ctx, cancel := s.withTimeout(ctx)
 	defer cancel()
 
@@ -528,6 +578,10 @@ func (s *PgStore) RemoveDependency(ctx context.Context, issueID, dependsOnID str
 }
 
 func (s *PgStore) ListDependencies(ctx context.Context, issueID string, direction string) ([]model.Dependency, error) {
+	if err := s.validateIssueOwnership(ctx, issueID); err != nil {
+		return nil, err
+	}
+
 	ctx, cancel := s.withTimeout(ctx)
 	defer cancel()
 
@@ -566,6 +620,12 @@ func (s *PgStore) ListDependencies(ctx context.Context, issueID string, directio
 }
 
 func (s *PgStore) GetDependencyTree(ctx context.Context, rootID string, maxDepth int) ([]model.TreeNode, error) {
+	if err := s.validateIssueOwnership(ctx, rootID); err != nil {
+		return nil, err
+	}
+
+	tid, _ := requireTenant(ctx)
+
 	ctx, cancel := s.withTimeout(ctx)
 	defer cancel()
 
@@ -573,18 +633,18 @@ func (s *PgStore) GetDependencyTree(ctx context.Context, rootID string, maxDepth
 	rows, err := s.pool.Query(ctx, `
 		WITH RECURSIVE tree AS (
 			SELECT id AS issue_id, 0 as depth
-			FROM issues WHERE id = $1
+			FROM issues WHERE id = $1 AND tenant_id = $3
 			UNION ALL
 			SELECT i.id, t.depth + 1
 			FROM issues i
 			JOIN dependencies d ON d.issue_id = i.id AND d.type = 'parent-child'
 			JOIN tree t ON d.depends_on_id = t.issue_id
-			WHERE t.depth < $2
+			WHERE t.depth < $2 AND i.tenant_id = $3
 		)
 		SELECT t.depth, `+issueColumns+`
 		FROM tree t
 		JOIN issues i ON i.id = t.issue_id
-		ORDER BY t.depth, i.priority, i.created_at`, rootID, maxDepth)
+		ORDER BY t.depth, i.priority, i.created_at`, rootID, maxDepth, tid)
 	if err != nil {
 		return nil, fmt.Errorf("walking dependency tree: %w", err)
 	}
@@ -609,6 +669,9 @@ func (s *PgStore) GetDependencyTree(ctx context.Context, rootID string, maxDepth
 // --- Labels ---
 
 func (s *PgStore) AddLabel(ctx context.Context, issueID, label string) error {
+	if err := s.validateIssueOwnership(ctx, issueID); err != nil {
+		return err
+	}
 	ctx, cancel := s.withTimeout(ctx)
 	defer cancel()
 	_, err := s.pool.Exec(ctx,
@@ -618,6 +681,9 @@ func (s *PgStore) AddLabel(ctx context.Context, issueID, label string) error {
 }
 
 func (s *PgStore) RemoveLabel(ctx context.Context, issueID, label string) error {
+	if err := s.validateIssueOwnership(ctx, issueID); err != nil {
+		return err
+	}
 	ctx, cancel := s.withTimeout(ctx)
 	defer cancel()
 	_, err := s.pool.Exec(ctx,
@@ -626,12 +692,19 @@ func (s *PgStore) RemoveLabel(ctx context.Context, issueID, label string) error 
 }
 
 func (s *PgStore) ListLabels(ctx context.Context, issueID string) ([]string, error) {
+	if err := s.validateIssueOwnership(ctx, issueID); err != nil {
+		return nil, err
+	}
 	return s.queryLabels(ctx, issueID)
 }
 
 // --- Comments ---
 
 func (s *PgStore) AddComment(ctx context.Context, issueID, author, text string) (*model.Comment, error) {
+	if err := s.validateIssueOwnership(ctx, issueID); err != nil {
+		return nil, err
+	}
+
 	ctx, cancel := s.withTimeout(ctx)
 	defer cancel()
 
@@ -648,6 +721,10 @@ func (s *PgStore) AddComment(ctx context.Context, issueID, author, text string) 
 }
 
 func (s *PgStore) ListComments(ctx context.Context, issueID string) ([]model.Comment, error) {
+	if err := s.validateIssueOwnership(ctx, issueID); err != nil {
+		return nil, err
+	}
+
 	ctx, cancel := s.withTimeout(ctx)
 	defer cancel()
 
@@ -673,6 +750,10 @@ func (s *PgStore) ListComments(ctx context.Context, issueID string) ([]model.Com
 // --- Events ---
 
 func (s *PgStore) AddEvent(ctx context.Context, input AddEventInput) (*model.Event, error) {
+	if err := s.validateIssueOwnership(ctx, input.IssueID); err != nil {
+		return nil, err
+	}
+
 	ctx, cancel := s.withTimeout(ctx)
 	defer cancel()
 
@@ -691,6 +772,10 @@ func (s *PgStore) AddEvent(ctx context.Context, input AddEventInput) (*model.Eve
 }
 
 func (s *PgStore) ListEvents(ctx context.Context, issueID string, limit int) ([]model.Event, error) {
+	if err := s.validateIssueOwnership(ctx, issueID); err != nil {
+		return nil, err
+	}
+
 	ctx, cancel := s.withTimeout(ctx)
 	defer cancel()
 
@@ -721,6 +806,10 @@ func (s *PgStore) ListEvents(ctx context.Context, issueID string, limit int) ([]
 // --- Compaction ---
 
 func (s *PgStore) SaveCompactionSnapshot(ctx context.Context, issueID string, level int, summary, original string) error {
+	if err := s.validateIssueOwnership(ctx, issueID); err != nil {
+		return err
+	}
+
 	ctx, cancel := s.withTimeout(ctx)
 	defer cancel()
 
@@ -731,6 +820,10 @@ func (s *PgStore) SaveCompactionSnapshot(ctx context.Context, issueID string, le
 }
 
 func (s *PgStore) GetCompactionSnapshots(ctx context.Context, issueID string) ([]model.CompactionSnapshot, error) {
+	if err := s.validateIssueOwnership(ctx, issueID); err != nil {
+		return nil, err
+	}
+
 	ctx, cancel := s.withTimeout(ctx)
 	defer cancel()
 
@@ -756,12 +849,17 @@ func (s *PgStore) GetCompactionSnapshots(ctx context.Context, issueID string) ([
 // --- Aggregation ---
 
 func (s *PgStore) CountIssuesByStatus(ctx context.Context) (map[string]int, error) {
+	tid, err := requireTenant(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	ctx, cancel := s.withTimeout(ctx)
 	defer cancel()
 
-	query := "SELECT status, COUNT(*) FROM issues WHERE 1=1"
-	args := []any{}
-	argN := 0
+	query := "SELECT status, COUNT(*) FROM issues WHERE tenant_id = $1"
+	args := []any{tid}
+	argN := 1
 	query, args, _ = addProjectFilter(ctx, query, args, argN, "project_id")
 	query += " GROUP BY status"
 
@@ -783,6 +881,37 @@ func (s *PgStore) CountIssuesByStatus(ctx context.Context) (map[string]int, erro
 	return counts, rows.Err()
 }
 
+// --- Tenant helpers ---
+
+// requireTenant extracts the tenant ID from context. Returns error if missing.
+func requireTenant(ctx context.Context) (uuid.UUID, error) {
+	tid, ok := auth.TenantFromContext(ctx)
+	if !ok {
+		return uuid.UUID{}, fmt.Errorf("no tenant in context")
+	}
+	return tid, nil
+}
+
+// validateIssueOwnership checks that the issue belongs to the tenant in context.
+// Returns "not found" (not "access denied") to avoid leaking existence.
+func (s *PgStore) validateIssueOwnership(ctx context.Context, issueID string) error {
+	tid, err := requireTenant(ctx)
+	if err != nil {
+		return err
+	}
+	var exists bool
+	err = s.pool.QueryRow(ctx,
+		"SELECT EXISTS(SELECT 1 FROM issues WHERE id = $1 AND tenant_id = $2)",
+		issueID, tid).Scan(&exists)
+	if err != nil {
+		return fmt.Errorf("checking issue ownership: %w", err)
+	}
+	if !exists {
+		return fmt.Errorf("issue %s not found", issueID)
+	}
+	return nil
+}
+
 // --- Helpers ---
 
 const issueColumns = `id, content_hash, title, description, design, acceptance_criteria, notes,
@@ -793,7 +922,7 @@ const issueColumns = `id, content_hash, title, description, design, acceptance_c
 	sender, ephemeral, mol_type, work_type, crystallizes, wisp_type,
 	pinned, is_template, quality_score, event_kind, actor, target, payload,
 	await_type, await_id, timeout_ns, agent_state, last_activity, role_type, rig,
-	hook_bead, role_bead, project_id`
+	hook_bead, role_bead, tenant_id, project_id`
 
 type querier interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
@@ -818,7 +947,7 @@ func scanIssueFromSingleRow(row pgx.Row) (*model.Issue, error) {
 		&ns{&i.Sender}, &i.Ephemeral, &ns{(*string)(&i.MolType)}, &ns{(*string)(&i.WorkType)}, &i.Crystallizes, &ns{(*string)(&i.WispType)},
 		&i.Pinned, &i.IsTemplate, &i.QualityScore, &ns{&i.EventKind}, &ns{&i.Actor}, &ns{&i.Target}, &ns{&i.Payload},
 		&ns{&i.AwaitType}, &ns{&i.AwaitID}, &ni64{(*int64)(&i.Timeout)}, &ns{(*string)(&i.AgentState)}, &i.LastActivity, &ns{&i.RoleType}, &ns{&i.Rig},
-		&ns{&i.HookBead}, &ns{&i.RoleBead}, &ns{&i.ProjectID},
+		&ns{&i.HookBead}, &ns{&i.RoleBead}, &ns{&i.TenantID}, &ns{&i.ProjectID},
 	)
 	if err != nil {
 		return nil, err
@@ -831,7 +960,7 @@ func scanIssueFromRow(rows pgx.Rows, extraFields ...any) (*model.Issue, error) {
 	var i model.Issue
 	var metadata []byte
 
-	scanArgs := make([]any, 0, len(extraFields)+53)
+	scanArgs := make([]any, 0, len(extraFields)+54)
 	scanArgs = append(scanArgs, extraFields...)
 	scanArgs = append(scanArgs,
 		&i.ID, &i.ContentHash, &i.Title, &i.Description, &i.Design,
@@ -843,7 +972,7 @@ func scanIssueFromRow(rows pgx.Rows, extraFields ...any) (*model.Issue, error) {
 		&ns{&i.Sender}, &i.Ephemeral, &ns{(*string)(&i.MolType)}, &ns{(*string)(&i.WorkType)}, &i.Crystallizes, &ns{(*string)(&i.WispType)},
 		&i.Pinned, &i.IsTemplate, &i.QualityScore, &ns{&i.EventKind}, &ns{&i.Actor}, &ns{&i.Target}, &ns{&i.Payload},
 		&ns{&i.AwaitType}, &ns{&i.AwaitID}, &ni64{(*int64)(&i.Timeout)}, &ns{(*string)(&i.AgentState)}, &i.LastActivity, &ns{&i.RoleType}, &ns{&i.Rig},
-		&ns{&i.HookBead}, &ns{&i.RoleBead}, &ns{&i.ProjectID},
+		&ns{&i.HookBead}, &ns{&i.RoleBead}, &ns{&i.TenantID}, &ns{&i.ProjectID},
 	)
 
 	if err := rows.Scan(scanArgs...); err != nil {
@@ -901,7 +1030,7 @@ func contentHash(i *model.Issue) string {
 }
 
 func nullEmpty(s string) *string {
-	if s == "" {
+	if s == "" || s == "null" {
 		return nil
 	}
 	return &s
