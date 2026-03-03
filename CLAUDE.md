@@ -160,6 +160,7 @@ Risk has two dimensions: **product risk** (will users/data be affected?) and **p
 - /orc-init-feature — Feature scaffolding and complexity assessment
 - /orc-dev-lead — Autonomous epic execution
 - /orc-dev-manager — Multi-epic batch execution
+- /orc-read-mail — Check Herald inbox for the project lead
 - /orc-status — Feature progress query
 - /orc-backlog — Project health dashboard
 - /orc-review — Code review checklist
@@ -168,3 +169,29 @@ Risk has two dimensions: **product risk** (will users/data be affected?) and **p
 - /orc-pattern-status — Enterprise pattern adoption report
 - /orc-promote-qa — QA deployment with validation gates
 - /orc-promote-prod — Production deployment with human approval
+
+## Post-Setup: Environment Infrastructure (Required)
+
+The orchestration lifecycle requires **two deployment environments** with strict progression:
+
+**Local → V&V → Production**
+
+| Environment | Purpose | Lifecycle Phases | Requirements |
+|-------------|---------|-----------------|--------------|
+| **Local** | Development and unit testing | Phase 4 (local tests) | Developer machine |
+| **V&V (Verification & Validation)** | Production-like testing at reduced scale | Phase 4 (integration tests), Phase 5 (deploy), Phase 7 (validation) | Same software versions as production, same service topology, smaller hardware |
+| **Production** | Live user-facing environment | Phase 8 (delivery) | Human approval gate required |
+
+**The orchestrator will NOT deploy to production without first verifying in V&V.** This is enforced by the lifecycle: Phase 5 deploys to V&V, Phase 7 validates there, and only Phase 8 promotes to production with human approval.
+
+## Post-Setup: Enterprise Pattern Seeding (Optional)
+
+After onboarding, seed your enterprise design patterns to guide AI agents:
+
+1. Run `/orc-manage-patterns` to browse, create, and manage patterns
+2. Start with common domains: UX layout, error handling, API conventions, navigation
+3. Each pattern should include: problem context, approved approach, code examples
+4. Patterns are tenant-scoped — they apply across ALL your projects
+5. Then create project-level constraints to specialize patterns for each tech stack
+
+This step is optional but strongly recommended — it prevents AI design drift across sessions.

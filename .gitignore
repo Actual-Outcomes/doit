@@ -19,3 +19,9 @@ vendor/
 
 # Beads (migrated to doit)
 .beads/
+
+# Claude Code local settings (contains permission history with credentials)
+.claude/settings.local.json
+
+# Terraform
+infra/.terraform/
