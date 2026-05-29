@@ -28,6 +28,8 @@ func RegisterAgentTools(server *mcp.Server, h *Handlers) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "doit_list_issues",
 		Description: "List issues with filtering by status, type, priority, assignee, and labels. " +
+			"status accepts a single status (open, in_progress, blocked, deferred, closed, pinned, hooked); " +
+			"omit status or pass \"all\" to span every status (use this for backlog browse and duplicate/overlap checks). " +
 			"Supports sorting by priority, oldest, updated, or hybrid. " +
 			"Use project slug to scope results to a single project. " +
 			"Set compact=true for minimal responses that save context window tokens. " +

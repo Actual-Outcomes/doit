@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/Actual-Outcomes/doit/internal/model"
 	"github.com/Actual-Outcomes/doit/internal/store"
@@ -37,6 +38,19 @@ func errResult(err error) (*mcp.CallToolResult, any, error) {
 		Content: []mcp.Content{&mcp.TextContent{Text: err.Error()}},
 		IsError: true,
 	}, nil, nil
+}
+
+// statusFilter converts a status argument into a filter pointer. The sentinels
+// "" (unset), "null" (MCP client null serialization), and "all" (caller wants
+// every status) all mean "no status filter" and return nil. Without this,
+// status="all" was passed through as a literal `status = 'all'` predicate, which
+// matches no rows and silently returned empty results (doit-1acc8, P0).
+func statusFilter(s string) *model.Status {
+	if s == "" || s == "null" || strings.EqualFold(s, "all") {
+		return nil
+	}
+	st := model.Status(s)
+	return &st
 }
 
 // strSet returns true if the pointer holds a meaningful value —
@@ -263,10 +277,7 @@ func (h *Handlers) ListIssues(ctx context.Context, _ *mcp.CallToolRequest, args 
 		Limit:  limit + 1, // fetch one extra to detect truncation
 		SortBy: args.SortBy,
 	}
-	if args.Status != "" {
-		s := model.Status(args.Status)
-		filter.Status = &s
-	}
+	filter.Status = statusFilter(args.Status)
 	if args.IssueType != "" {
 		t := model.IssueType(args.IssueType)
 		filter.IssueType = &t

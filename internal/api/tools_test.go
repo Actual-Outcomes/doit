@@ -446,6 +446,80 @@ func TestListIssues_PinnedFilter(t *testing.T) {
 	}
 }
 
+// TestListIssues_StatusAll_IncludesAllStatuses reproduces doit-1acc8 (P0): the
+// "all" sentinel was passed straight through as a literal status filter
+// (status = 'all'), which matches no rows. As a result list_issues silently
+// returned {count: 0, items: []} for every status="all" query — breaking backlog
+// browse and overlap/duplicate checks (a real related ticket was missed).
+func TestListIssues_StatusAll_IncludesAllStatuses(t *testing.T) {
+	ms := newMockStore()
+	h := NewHandlers(ms)
+	ms.issues["open1"] = &model.Issue{ID: "open1", Title: "Open one", Status: model.StatusOpen}
+	ms.issues["closed1"] = &model.Issue{ID: "closed1", Title: "Closed one", Status: model.StatusClosed}
+	ms.issues["blocked1"] = &model.Issue{ID: "blocked1", Title: "Blocked one", Status: model.StatusBlocked}
+
+	compact := true
+	result, _, err := h.ListIssues(context.Background(), nil, listIssuesArgs{
+		Status:  "all",
+		Compact: &compact,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("expected success, got error: %s", result.Content[0].(*mcp.TextContent).Text)
+	}
+
+	text := result.Content[0].(*mcp.TextContent).Text
+	var resp listResponse
+	if err := json.Unmarshal([]byte(text), &resp); err != nil {
+		t.Fatalf("failed to parse response envelope: %v", err)
+	}
+	// status="all" must span every status — open, closed, AND blocked — not be empty.
+	if resp.Count != 3 {
+		t.Fatalf("status=all should return all 3 issues regardless of status, got count=%d (response: %s)", resp.Count, text)
+	}
+	for _, want := range []string{"Open one", "Closed one", "Blocked one"} {
+		if !contains(text, want) {
+			t.Errorf("status=all response should include %q", want)
+		}
+	}
+}
+
+// TestListIssues_StatusOpen_OnlyOpen asserts that a real status value still
+// filters correctly (DoD #1): status="open" returns the open issues and excludes
+// closed ones — the same open set doit_ready surfaces.
+func TestListIssues_StatusOpen_OnlyOpen(t *testing.T) {
+	ms := newMockStore()
+	h := NewHandlers(ms)
+	ms.issues["open1"] = &model.Issue{ID: "open1", Title: "Open one", Status: model.StatusOpen}
+	ms.issues["closed1"] = &model.Issue{ID: "closed1", Title: "Closed one", Status: model.StatusClosed}
+
+	compact := true
+	result, _, err := h.ListIssues(context.Background(), nil, listIssuesArgs{
+		Status:  "open",
+		Compact: &compact,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	text := result.Content[0].(*mcp.TextContent).Text
+	var resp listResponse
+	if err := json.Unmarshal([]byte(text), &resp); err != nil {
+		t.Fatalf("failed to parse response envelope: %v", err)
+	}
+	if resp.Count != 1 {
+		t.Fatalf("status=open should return only the 1 open issue, got count=%d (response: %s)", resp.Count, text)
+	}
+	if !contains(text, "Open one") {
+		t.Error("status=open response should include the open issue")
+	}
+	if contains(text, "Closed one") {
+		t.Error("status=open response should NOT include the closed issue")
+	}
+}
+
 func TestReady_Compact(t *testing.T) {
 	ms := newMockStore()
 	h := NewHandlers(ms)
