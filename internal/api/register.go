@@ -30,6 +30,7 @@ func RegisterAgentTools(server *mcp.Server, h *Handlers) {
 		Description: "List issues with filtering by status, type, priority, assignee, and labels. " +
 			"status accepts a single status (open, in_progress, blocked, deferred, closed, pinned, hooked); " +
 			"omit status or pass \"all\" to span every status (use this for backlog browse and duplicate/overlap checks). " +
+			"issue_type filters to one type (epic, task, subtask, bug, feature, chore, decision); omit it or pass \"all\" (case-insensitive) to span every type. " +
 			"Supports sorting by priority, oldest, updated, or hybrid. " +
 			"Use project slug to scope results to a single project. " +
 			"Set compact=true for minimal responses that save context window tokens. " +

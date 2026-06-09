@@ -53,6 +53,20 @@ func statusFilter(s string) *model.Status {
 	return &st
 }
 
+// issueTypeFilter converts an issue_type argument into a filter pointer. Like
+// statusFilter, the sentinels "" (unset), "null" (MCP client null serialization),
+// and "all" (caller wants every type) all mean "no type filter" and return nil.
+// Without this, issue_type="all" was passed through as a literal
+// `issue_type = 'all'` predicate, which matches no rows and silently returned
+// empty results — the same defect class as the status="all" bug (doit-1acc8/doit-fcaf8).
+func issueTypeFilter(s string) *model.IssueType {
+	if s == "" || s == "null" || strings.EqualFold(s, "all") {
+		return nil
+	}
+	t := model.IssueType(s)
+	return &t
+}
+
 // strSet returns true if the pointer holds a meaningful value —
 // not nil, not empty, and not the literal string "null" that some
 // MCP clients send in place of JSON null.
@@ -278,10 +292,7 @@ func (h *Handlers) ListIssues(ctx context.Context, _ *mcp.CallToolRequest, args 
 		SortBy: args.SortBy,
 	}
 	filter.Status = statusFilter(args.Status)
-	if args.IssueType != "" {
-		t := model.IssueType(args.IssueType)
-		filter.IssueType = &t
-	}
+	filter.IssueType = issueTypeFilter(args.IssueType)
 	if args.Priority != nil {
 		filter.Priority = args.Priority
 	}

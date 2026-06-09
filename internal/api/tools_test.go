@@ -77,6 +77,9 @@ func (m *mockStore) ListIssues(_ context.Context, filter model.IssueFilter) ([]m
 		if filter.Status != nil && issue.Status != *filter.Status {
 			continue
 		}
+		if filter.IssueType != nil && issue.IssueType != *filter.IssueType {
+			continue
+		}
 		if filter.Pinned != nil && issue.Pinned != *filter.Pinned {
 			continue
 		}
@@ -517,6 +520,75 @@ func TestListIssues_StatusOpen_OnlyOpen(t *testing.T) {
 	}
 	if contains(text, "Closed one") {
 		t.Error("status=open response should NOT include the closed issue")
+	}
+}
+
+// TestListIssues_IssueTypeAll_IncludesAllTypes reproduces doit-fcaf8 (P0): the
+// "all" sentinel was passed straight through as a literal issue_type filter
+// (issue_type = 'all'), which matches no rows. Because the consuming agent passes
+// issue_type="all" on every backlog-enumeration call, list_issues silently
+// returned {count: 0} for every status — while doit_ready (which has no issue_type
+// arg) worked — producing the misleading "ready works, list is broken" divergence.
+func TestListIssues_IssueTypeAll_IncludesAllTypes(t *testing.T) {
+	ms := newMockStore()
+	h := NewHandlers(ms)
+	ms.issues["epic1"] = &model.Issue{ID: "epic1", Title: "An epic", Status: model.StatusOpen, IssueType: model.TypeEpic}
+	ms.issues["task1"] = &model.Issue{ID: "task1", Title: "A task", Status: model.StatusOpen, IssueType: model.TypeTask}
+
+	compact := true
+	result, _, err := h.ListIssues(context.Background(), nil, listIssuesArgs{
+		Status:    "all",
+		IssueType: "all",
+		Compact:   &compact,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("expected success, got error: %s", result.Content[0].(*mcp.TextContent).Text)
+	}
+
+	text := result.Content[0].(*mcp.TextContent).Text
+	var resp listResponse
+	if err := json.Unmarshal([]byte(text), &resp); err != nil {
+		t.Fatalf("failed to parse response envelope: %v", err)
+	}
+	// issue_type="all" must span every type — epic AND task — not be empty.
+	if resp.Count != 2 {
+		t.Fatalf("issue_type=all should return all 2 issues regardless of type, got count=%d (response: %s)", resp.Count, text)
+	}
+}
+
+// TestListIssues_IssueTypeTask_OnlyTask asserts that a real issue_type value still
+// filters correctly (DoD #1): issue_type="task" returns tasks and excludes epics.
+func TestListIssues_IssueTypeTask_OnlyTask(t *testing.T) {
+	ms := newMockStore()
+	h := NewHandlers(ms)
+	ms.issues["epic1"] = &model.Issue{ID: "epic1", Title: "An epic", Status: model.StatusOpen, IssueType: model.TypeEpic}
+	ms.issues["task1"] = &model.Issue{ID: "task1", Title: "A task", Status: model.StatusOpen, IssueType: model.TypeTask}
+
+	compact := true
+	result, _, err := h.ListIssues(context.Background(), nil, listIssuesArgs{
+		IssueType: "task",
+		Compact:   &compact,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	text := result.Content[0].(*mcp.TextContent).Text
+	var resp listResponse
+	if err := json.Unmarshal([]byte(text), &resp); err != nil {
+		t.Fatalf("failed to parse response envelope: %v", err)
+	}
+	if resp.Count != 1 {
+		t.Fatalf("issue_type=task should return only the 1 task, got count=%d (response: %s)", resp.Count, text)
+	}
+	if !contains(text, "A task") {
+		t.Error("issue_type=task response should include the task")
+	}
+	if contains(text, "An epic") {
+		t.Error("issue_type=task response should NOT include the epic")
 	}
 }
 
